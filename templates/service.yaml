@@ -1,4 +1,4 @@
-{{- if and .Values.service.enabled (eq .Values.workload.type "Deployment") }}
+{{- if and .Values.service.enabled (or (eq .Values.workload.type "Deployment") (eq .Values.workload.type "StatefulSet")) }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -33,4 +33,3 @@ spec:
   selector:
     {{- include "application-chart.selectorLabels" . | nindent 4 }}
 {{- end }}
-

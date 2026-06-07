@@ -5,7 +5,7 @@ nameOverride: ""
 fullnameOverride: ""
 
 workload:
-  # Supported values: Deployment, Job, CronJob
+  # Supported values: Deployment, StatefulSet, Job, CronJob
   type: Deployment
 
 replicaCount: 2
@@ -170,6 +170,14 @@ deploymentStrategy:
     maxUnavailable: 0
     maxSurge: 25%
 
+statefulSet:
+  serviceName: ""
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  persistentVolumeClaimRetentionPolicy: {}
+  volumeClaimTemplates: []
+
 terminationGracePeriodSeconds: 30
 priorityClassName: ""
 runtimeClassName: ""
@@ -221,4 +229,3 @@ tests:
     repository: busybox
     tag: "1.36"
     pullPolicy: IfNotPresent
-

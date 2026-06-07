@@ -1,0 +1,26 @@
+name: Publish Helm Chart
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Chart.yaml"
+      - "values.yaml"
+      - "values.schema.json"
+      - "templates/**"
+      - "examples/**"
+      - ".github/workflows/publish-helm-chart.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    uses: faridlamaul/ci-template/.github/workflows/publish-gh-pages.yaml@main
+    with:
+      chart_dir: "."
+      helm_repo_url: "https://faridlamaul.github.io/application-chart"
+      publish_branch: "gh-pages"
+

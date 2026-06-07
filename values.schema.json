@@ -8,7 +8,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["Deployment", "Job", "CronJob"]
+          "enum": ["Deployment", "StatefulSet", "Job", "CronJob"]
         }
       },
       "required": ["type"]
@@ -228,6 +228,68 @@
         }
       }
     },
+    "statefulSet": {
+      "type": "object",
+      "properties": {
+        "serviceName": {
+          "type": "string"
+        },
+        "podManagementPolicy": {
+          "type": "string",
+          "enum": ["OrderedReady", "Parallel"]
+        },
+        "updateStrategy": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["RollingUpdate", "OnDelete"]
+            }
+          }
+        },
+        "persistentVolumeClaimRetentionPolicy": {
+          "type": "object"
+        },
+        "volumeClaimTemplates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["metadata", "spec"],
+            "properties": {
+              "metadata": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "spec": {
+                "type": "object",
+                "required": ["accessModes", "resources"],
+                "properties": {
+                  "accessModes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "resources": {
+                    "type": "object"
+                  },
+                  "storageClassName": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "resources": {
       "type": "object",
       "properties": {
@@ -241,4 +303,3 @@
     }
   }
 }
-

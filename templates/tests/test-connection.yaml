@@ -1,4 +1,4 @@
-{{- if and .Values.tests.enabled .Values.service.enabled (eq .Values.workload.type "Deployment") }}
+{{- if and .Values.tests.enabled .Values.service.enabled (or (eq .Values.workload.type "Deployment") (eq .Values.workload.type "StatefulSet")) }}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -19,4 +19,3 @@ spec:
         - "-qO-"
         - "{{ include "application-chart.fullname" . }}:{{ (index .Values.service.ports 0).port }}"
 {{- end }}
-

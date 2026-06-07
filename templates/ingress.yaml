@@ -1,4 +1,4 @@
-{{- if and .Values.ingress.enabled .Values.service.enabled (eq .Values.workload.type "Deployment") }}
+{{- if and .Values.ingress.enabled .Values.service.enabled (or (eq .Values.workload.type "Deployment") (eq .Values.workload.type "StatefulSet")) }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -39,4 +39,3 @@ spec:
           {{- end }}
     {{- end }}
 {{- end }}
-

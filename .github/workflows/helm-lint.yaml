@@ -1,0 +1,34 @@
+name: Helm Lint
+
+on:
+  pull_request:
+    paths:
+      - "Chart.yaml"
+      - "values.yaml"
+      - "values.schema.json"
+      - "templates/**"
+      - "examples/**"
+      - ".github/workflows/helm-lint.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "Chart.yaml"
+      - "values.yaml"
+      - "values.schema.json"
+      - "templates/**"
+      - "examples/**"
+      - ".github/workflows/helm-lint.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  helm-lint:
+    uses: faridlamaul/ci-template/.github/workflows/helm-lint.yaml@main
+    with:
+      chart_dir: "."
+      release_name: "application-chart"
+      render_value_files: "examples/values-api.yaml examples/values-worker.yaml examples/values-cronjob.yaml examples/values-statefulset.yaml examples/values-internal-service.yaml examples/values-public-ingress.yaml examples/values-secure-production.yaml"
+

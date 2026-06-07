@@ -1,0 +1,75 @@
+nameOverride: cache
+
+workload:
+  type: StatefulSet
+
+replicaCount: 3
+
+image:
+  repository: redis
+  tag: "7.2.5"
+
+containerPorts:
+  - name: redis
+    containerPort: 6379
+    protocol: TCP
+
+service:
+  enabled: true
+  type: ClusterIP
+  headless: true
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+      protocol: TCP
+
+statefulSet:
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+
+volumeMounts:
+  - name: data
+    mountPath: /data
+
+readinessProbe:
+  enabled: true
+  tcpSocket:
+    port: redis
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+livenessProbe:
+  enabled: true
+  tcpSocket:
+    port: redis
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+  maxUnavailable: null
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+tests:
+  enabled: false
