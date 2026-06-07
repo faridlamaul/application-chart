@@ -1,0 +1,38 @@
+{{- if eq .Values.workload.type "Job" }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "application-chart.fullname" . }}
+  labels:
+    {{- include "application-chart.labels" . | nindent 4 }}
+    {{- with .Values.job.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.job.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  backoffLimit: {{ .Values.job.backoffLimit }}
+  {{- with .Values.job.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ . }}
+  {{- end }}
+  {{- with .Values.job.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ . }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "application-chart.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- $container := dict "command" .Values.job.command "args" .Values.job.args "env" .Values.job.env "envFrom" .Values.job.envFrom "resources" .Values.job.resources "ports" (list) -}}
+      {{- include "application-chart.podSpec" (dict "root" . "container" $container "restartPolicy" .Values.job.restartPolicy) | nindent 6 }}
+{{- end }}
+

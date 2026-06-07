@@ -1,0 +1,37 @@
+nameOverride: report-exporter
+
+workload:
+  type: CronJob
+
+image:
+  repository: ghcr.io/example/report-exporter
+  tag: "0.9.7"
+
+containerPorts: []
+
+service:
+  enabled: false
+
+cronjob:
+  schedule: "15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  backoffLimit: 2
+  restartPolicy: OnFailure
+  command:
+    - /app/export-reports
+  args:
+    - --window
+    - 1h
+  env:
+    - name: APP_ENV
+      value: production
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+

@@ -1,0 +1,40 @@
+nameOverride: notification-worker
+
+workload:
+  type: Deployment
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/example/notification-worker
+  tag: "2.8.1"
+
+containerPorts: []
+
+command:
+  - /app/worker
+args:
+  - --queue
+  - notifications
+
+env:
+  - name: APP_ENV
+    value: production
+  - name: QUEUE_NAME
+    value: notifications
+
+service:
+  enabled: false
+
+readinessProbe:
+  enabled: false
+livenessProbe:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+

@@ -1,0 +1,22 @@
+{{- if and .Values.tests.enabled .Values.service.enabled (eq .Values.workload.type "Deployment") }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "application-chart.fullname" . }}-test-connection"
+  labels:
+    {{- include "application-chart.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  restartPolicy: Never
+  containers:
+    - name: wget
+      image: "{{ .Values.tests.image.repository }}:{{ .Values.tests.image.tag }}"
+      imagePullPolicy: {{ .Values.tests.image.pullPolicy }}
+      command:
+        - wget
+      args:
+        - "-qO-"
+        - "{{ include "application-chart.fullname" . }}:{{ (index .Values.service.ports 0).port }}"
+{{- end }}
+

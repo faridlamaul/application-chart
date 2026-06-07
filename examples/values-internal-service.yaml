@@ -1,0 +1,43 @@
+nameOverride: inventory-api
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/example/inventory-api
+  tag: "3.2.0"
+
+service:
+  enabled: true
+  type: ClusterIP
+  headless: false
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+
+ingress:
+  enabled: false
+
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: platform
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+

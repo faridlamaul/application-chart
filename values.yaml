@@ -1,0 +1,224 @@
+# Default values for application-chart.
+# This file is intentionally generic. Do not commit real secrets here.
+
+nameOverride: ""
+fullnameOverride: ""
+
+workload:
+  # Supported values: Deployment, Job, CronJob
+  type: Deployment
+
+replicaCount: 2
+revisionHistoryLimit: 10
+
+image:
+  repository: nginx
+  tag: "1.27"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+command: []
+args: []
+
+containerPorts:
+  - name: http
+    containerPort: 8080
+    protocol: TCP
+
+env: []
+envFrom: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+livenessProbe:
+  enabled: false
+readinessProbe:
+  enabled: false
+startupProbe:
+  enabled: false
+
+lifecycle: {}
+
+podAnnotations: {}
+podLabels: {}
+annotations: {}
+labels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+serviceAccount:
+  create: true
+  automount: false
+  annotations: {}
+  name: ""
+
+rbac:
+  create: false
+  rules: []
+
+service:
+  enabled: true
+  type: ClusterIP
+  headless: false
+  annotations: {}
+  labels: {}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  sessionAffinity: None
+  sessionAffinityConfig: {}
+  internalTrafficPolicy: ""
+  externalTrafficPolicy: ""
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: app.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          servicePort: http
+  tls: []
+
+configMap:
+  enabled: false
+  name: ""
+  annotations: {}
+  labels: {}
+  data: {}
+
+secret:
+  enabled: false
+  name: ""
+  annotations: {}
+  labels: {}
+  type: Opaque
+  data: {}
+  stringData: {}
+
+externalSecret:
+  enabled: false
+  apiVersion: external-secrets.io/v1beta1
+  refreshInterval: 1h
+  secretStoreRef:
+    name: default-secret-store
+    kind: ClusterSecretStore
+  target:
+    name: ""
+    creationPolicy: Owner
+  data: []
+  dataFrom: []
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: null
+  metrics: []
+  behavior: {}
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  maxUnavailable: ""
+
+networkPolicy:
+  enabled: false
+  labels: {}
+  policyTypes:
+    - Ingress
+  ingress: []
+  egress: []
+
+serviceMonitor:
+  enabled: false
+  namespace: ""
+  labels: {}
+  annotations: {}
+  interval: 30s
+  scrapeTimeout: 10s
+  path: /metrics
+  port: http
+  scheme: http
+  relabelings: []
+  metricRelabelings: []
+
+deploymentStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 0
+    maxSurge: 25%
+
+terminationGracePeriodSeconds: 30
+priorityClassName: ""
+runtimeClassName: ""
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
+volumes: []
+volumeMounts: []
+initContainers: []
+extraContainers: []
+
+job:
+  enabled: true
+  annotations: {}
+  labels: {}
+  backoffLimit: 6
+  activeDeadlineSeconds: null
+  ttlSecondsAfterFinished: 300
+  restartPolicy: Never
+  command: []
+  args: []
+  env: []
+  envFrom: []
+  resources: {}
+
+cronjob:
+  enabled: true
+  annotations: {}
+  labels: {}
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  startingDeadlineSeconds: null
+  suspend: false
+  backoffLimit: 6
+  restartPolicy: OnFailure
+  command: []
+  args: []
+  env: []
+  envFrom: []
+  resources: {}
+
+tests:
+  enabled: true
+  image:
+    repository: busybox
+    tag: "1.36"
+    pullPolicy: IfNotPresent
+
