@@ -3,10 +3,10 @@ entries:
   application-chart:
   - apiVersion: v2
     appVersion: 1.0.0
-    created: "2026-06-07T18:26:43.480421631Z"
+    created: "2026-06-07T18:29:41.759823836Z"
     description: A generic, production-ready Helm chart for Kubernetes application
       workloads
-    digest: f7964d7b4397a8a5e410fed52d08af65843109b5cd978075a0438c8b5ae5183b
+    digest: e59a73374b4255de28cf9b52ef17382c75de25f7ec70b083fb20d5c6a0a1e2b3
     keywords:
     - application
     - backend
@@ -22,4 +22,4 @@ entries:
     urls:
     - https://faridlamaul.github.io/application-chart/application-chart-0.2.0.tgz
     version: 0.2.0
-generated: "2026-06-07T18:26:43.479204184Z"
+generated: "2026-06-07T18:29:41.758643644Z"
