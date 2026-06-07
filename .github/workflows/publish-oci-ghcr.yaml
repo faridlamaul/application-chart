@@ -1,0 +1,19 @@
+name: Publish Helm OCI
+
+on:
+  push:
+    tags:
+      - "application-chart-*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish-oci:
+    uses: faridlamaul/ci-template/.github/workflows/publish-oci-ghcr.yaml@main
+    with:
+      chart_dir: "."
+      oci_repository: "ghcr.io/faridlamaul/charts"
+
