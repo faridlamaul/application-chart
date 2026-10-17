@@ -56,9 +56,11 @@ jobs:
               /m
           done
 
+      # The image's default user (uid 1000) cannot write to the runner's
+      # checkout, so run as the runner's user with a writable HOME.
       - name: Unit tests
         run: >
-          docker run --rm -v "$PWD:/apps"
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/apps"
           helmunittest/helm-unittest:4.3.0-1.2.1@sha256:28ea86c3e0b07f501f0c2e9c08b9f41e240f4a4b571cb5106b36cf0f0607e989
           .
 
