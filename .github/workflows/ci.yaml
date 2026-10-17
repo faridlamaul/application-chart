@@ -1,0 +1,110 @@
+name: CI
+
+# Runs on pull requests and, through workflow_call, before every publish.
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    name: Lint, schema, and unit tests (Helm ${{ matrix.helm }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        helm: [v3.22.1, v4.3.1]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ matrix.helm }}
+
+      - name: Lint default values and every example
+        run: |
+          helm lint . --strict
+          for f in examples/*.yaml; do
+            helm lint . --strict -f "$f"
+          done
+
+      - name: Render default values and every example
+        run: |
+          mkdir -p rendered
+          helm template app . > rendered/default.yaml
+          for f in examples/*.yaml; do
+            helm template app . -f "$f" > "rendered/$(basename "$f")"
+          done
+          # --set produces int64 values, which YAML files never do.
+          helm template app . --set ingress.enabled=true --set ingress.hosts[0].host=a.example.com \
+            --set ingress.hosts[0].paths[0].path=/ --set ingress.hosts[0].paths[0].servicePort=80 \
+            > rendered/set-int-service-port.yaml
+
+      - name: Validate manifests against the minimum and a current Kubernetes version
+        run: |
+          for k8s in 1.25.0 1.33.0; do
+            docker run --rm -v "$PWD/rendered:/m" ghcr.io/yannh/kubeconform:v0.8.0 \
+              -strict -summary -kubernetes-version "$k8s" \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              /m
+          done
+
+      - name: Unit tests
+        run: >
+          docker run --rm -v "$PWD:/apps"
+          helmunittest/helm-unittest:4.3.0-1.2.1@sha256:28ea86c3e0b07f501f0c2e9c08b9f41e240f4a4b571cb5106b36cf0f0607e989
+          .
+
+  install:
+    name: Install on kind
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.1
+
+      - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+
+      - name: Default values install, become ready, and pass helm test
+        run: |
+          helm install web . --wait --timeout 3m
+          helm test web --logs
+
+      - name: StatefulSet pods resolve through the headless governing Service
+        run: |
+          helm install db . --set workload.type=StatefulSet --set replicaCount=1 --wait --timeout 3m
+          kubectl run dns-check --image=busybox:1.36 --restart=Never --rm -i --quiet -- \
+            nslookup db-application-chart-0.db-application-chart-headless
+
+      - name: Redis StatefulSet example runs as non-root with storage
+        run: |
+          helm install cache . -f examples/values-statefulset.yaml --set replicaCount=1 \
+            --set 'statefulSet.volumeClaimTemplates[0].spec.resources.requests.storage=1Gi' \
+            --wait --timeout 4m
+          kubectl exec cache-0 -- redis-cli ping | grep PONG
+
+      - name: Job runs as a hook and an upgrade with a changed pod template succeeds
+        run: |
+          job_args=(--set workload.type=Job --set image.repository=busybox --set image.tag=1.36
+            --set podSecurityContext.runAsUser=65534 --set 'job.command={sh,-c,echo done}'
+            --set service.enabled=false --wait --timeout 3m)
+          helm install batch . "${job_args[@]}"
+          kubectl wait --for=condition=complete job/batch-application-chart --timeout=60s
+          helm upgrade batch . "${job_args[@]}" --set 'job.env[0].name=RUN' --set 'job.env[0].value=2'
+          kubectl get job batch-application-chart -o jsonpath='{.spec.template.spec.containers[0].env[0].value}' | grep -x 2
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl get all,pvc -A
+          kubectl get events -A --sort-by=.lastTimestamp | tail -50

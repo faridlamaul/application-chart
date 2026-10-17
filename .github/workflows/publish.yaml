@@ -1,0 +1,89 @@
+name: Publish
+
+# Every push to main runs CI. When Chart.yaml carries a version that has no
+# application-chart-<version> tag yet, the chart is pushed to GHCR (OCI), added
+# to the GitHub Pages repository, and tagged with a GitHub Release. The tag is
+# created last, so a failed run can simply be re-run.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yaml
+
+  publish:
+    name: Publish chart
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.1
+
+      - id: chart
+        name: Check whether this version is already published
+        run: |
+          version="$(helm show chart . | sed -n 's/^version: //p')"
+          tag="application-chart-${version}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null; then
+            echo "new=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::${tag} is already published; bump version in Chart.yaml to publish."
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Package
+        if: steps.chart.outputs.new == 'true'
+        run: helm package . --destination dist
+
+      - name: Push to GHCR (OCI)
+        if: steps.chart.outputs.new == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.chart.outputs.version }}
+        run: |
+          echo "$GITHUB_TOKEN" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
+          helm push "dist/application-chart-${VERSION}.tgz" oci://ghcr.io/faridlamaul/charts
+
+      - name: Add to the GitHub Pages repository
+        if: steps.chart.outputs.new == 'true'
+        env:
+          VERSION: ${{ steps.chart.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin gh-pages
+          git worktree add pages origin/gh-pages
+          cp "dist/application-chart-${VERSION}.tgz" pages/
+          helm repo index pages --url https://faridlamaul.github.io/application-chart --merge pages/index.yaml
+          git -C pages add "application-chart-${VERSION}.tgz" index.yaml
+          git -C pages commit -m "Publish application-chart ${VERSION}"
+          git -C pages push origin HEAD:gh-pages
+
+      - name: Tag and create the GitHub Release
+        if: steps.chart.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.chart.outputs.tag }}
+          VERSION: ${{ steps.chart.outputs.version }}
+        run: |
+          gh release create "$TAG" "dist/application-chart-${VERSION}.tgz" \
+            --target "$GITHUB_SHA" --title "$TAG" \
+            --notes "Changes: [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}/CHANGELOG.md). Install with \`helm install <release> oci://ghcr.io/faridlamaul/charts/application-chart --version ${VERSION}\`."
