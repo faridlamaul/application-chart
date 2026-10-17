@@ -7,10 +7,7 @@ metadata:
   namespace: {{ . }}
   {{- end }}
   labels:
-    {{- include "application-chart.labels" . | nindent 4 }}
-    {{- with .Values.serviceMonitor.labels }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
+    {{- include "application-chart.labelsWith" (dict "root" . "extra" .Values.serviceMonitor.labels) | nindent 4 }}
   {{- with .Values.serviceMonitor.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -19,6 +16,10 @@ spec:
   selector:
     matchLabels:
       {{- include "application-chart.selectorLabels" . | nindent 6 }}
+    # Skip the StatefulSet's -headless governing Service so pods are scraped once.
+    matchExpressions:
+      - key: application-chart/governing-service
+        operator: DoesNotExist
   namespaceSelector:
     matchNames:
       - {{ .Release.Namespace }}

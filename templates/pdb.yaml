@@ -1,5 +1,9 @@
 {{- if and .Values.podDisruptionBudget.enabled (or (eq .Values.workload.type "Deployment") (eq .Values.workload.type "StatefulSet")) }}
-{{- if and .Values.podDisruptionBudget.minAvailable .Values.podDisruptionBudget.maxUnavailable }}
+{{- $min := .Values.podDisruptionBudget.minAvailable }}
+{{- $max := .Values.podDisruptionBudget.maxUnavailable }}
+{{- $hasMin := not (or (kindIs "invalid" $min) (eq (toString $min) "")) }}
+{{- $hasMax := not (or (kindIs "invalid" $max) (eq (toString $max) "")) }}
+{{- if and $hasMin $hasMax }}
 {{- fail "Set only one of podDisruptionBudget.minAvailable or podDisruptionBudget.maxUnavailable" }}
 {{- end }}
 apiVersion: policy/v1
@@ -9,11 +13,11 @@ metadata:
   labels:
     {{- include "application-chart.labels" . | nindent 4 }}
 spec:
-  {{- with .Values.podDisruptionBudget.minAvailable }}
-  minAvailable: {{ . }}
-  {{- end }}
-  {{- with .Values.podDisruptionBudget.maxUnavailable }}
-  maxUnavailable: {{ . }}
+  {{- if $hasMax }}
+  maxUnavailable: {{ $max }}
+  {{- else }}
+  # minAvailable defaults to 1 when neither field is set.
+  minAvailable: {{ ternary $min 1 $hasMin }}
   {{- end }}
   selector:
     matchLabels:

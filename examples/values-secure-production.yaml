@@ -87,12 +87,25 @@ securityContext:
     drop:
       - ALL
 
+# A read-only root filesystem still needs a writable /tmp for most runtimes.
+volumes:
+  - name: tmp
+    emptyDir: {}
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
 serviceMonitor:
   enabled: true
   labels:
     release: kube-prometheus-stack
   path: /metrics
   port: http
+
+# The NetworkPolicy admits only the ingress controller and Prometheus, so the
+# `helm test` pod could not reach the Service.
+tests:
+  enabled: false
 
 networkPolicy:
   enabled: true
@@ -104,15 +117,30 @@ networkPolicy:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ingress-nginx
+        # Prometheus scrapes /metrics on the same port (serviceMonitor above).
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
       ports:
         - protocol: TCP
           port: 8080
   egress:
     - to:
-        - namespaceSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
       ports:
         - protocol: TCP
           port: 53
         - protocol: UDP
           port: 53
-
+    # PostgreSQL behind DATABASE_URL; replace the CIDR with your database subnet.
+    - to:
+        - ipBlock:
+            cidr: 10.20.0.0/16
+      ports:
+        - protocol: TCP
+          port: 5432

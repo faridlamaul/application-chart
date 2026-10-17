@@ -3,12 +3,26 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: "{{ include "application-chart.fullname" . }}-test-connection"
+  # Not the workload's selector labels: the test pod must not join the
+  # Service, NetworkPolicy, or PodDisruptionBudget of the application.
   labels:
-    {{- include "application-chart.labels" . | nindent 4 }}
+    helm.sh/chart: {{ include "application-chart.chart" . }}
+    app.kubernetes.io/name: {{ printf "%s-test" (include "application-chart.name" . | trunc 58 | trimSuffix "-") }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: test
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
   annotations:
     "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    runAsGroup: 65534
+    seccompProfile:
+      type: RuntimeDefault
   containers:
     - name: wget
       image: "{{ .Values.tests.image.repository }}:{{ .Values.tests.image.tag }}"
@@ -18,4 +32,16 @@ spec:
       args:
         - "-qO-"
         - "{{ include "application-chart.fullname" . }}:{{ (index .Values.service.ports 0).port }}"
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi
 {{- end }}

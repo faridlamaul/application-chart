@@ -1,0 +1,124 @@
+suite: supporting resources
+templates:
+  - templates/hpa.yaml
+  - templates/pdb.yaml
+  - templates/ingress.yaml
+  - templates/externalsecret.yaml
+  - templates/secret.yaml
+  - templates/tests/test-connection.yaml
+tests:
+  - it: fails instead of silently skipping autoscaling for a StatefulSet
+    template: templates/hpa.yaml
+    set:
+      workload.type: StatefulSet
+      autoscaling.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: autoscaling.enabled is supported only for workload.type Deployment
+
+  - it: defaults the PodDisruptionBudget to minAvailable 1
+    template: templates/pdb.yaml
+    set:
+      podDisruptionBudget.enabled: true
+    asserts:
+      - equal:
+          path: spec
+          value:
+            minAvailable: 1
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: application-chart
+                app.kubernetes.io/instance: RELEASE-NAME
+
+  - it: accepts maxUnavailable alone
+    template: templates/pdb.yaml
+    set:
+      podDisruptionBudget.enabled: true
+      podDisruptionBudget.maxUnavailable: 1
+    asserts:
+      - equal:
+          path: spec.maxUnavailable
+          value: 1
+      - notExists:
+          path: spec.minAvailable
+
+  - it: renders minAvailable 0
+    template: templates/pdb.yaml
+    set:
+      podDisruptionBudget.enabled: true
+      podDisruptionBudget.minAvailable: 0
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: 0
+
+  - it: rejects both minAvailable and maxUnavailable
+    template: templates/pdb.yaml
+    set:
+      podDisruptionBudget.enabled: true
+      podDisruptionBudget.minAvailable: 1
+      podDisruptionBudget.maxUnavailable: 1
+    asserts:
+      - failedTemplate:
+          errorPattern: Set only one of podDisruptionBudget.minAvailable or podDisruptionBudget.maxUnavailable
+
+  - it: routes a numeric servicePort by number and a named one by name
+    template: templates/ingress.yaml
+    set:
+      ingress.enabled: true
+      ingress.hosts:
+        - host: a.example.com
+          paths:
+            - path: /
+              servicePort: 8080
+            - path: /admin
+              servicePort: admin
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port
+          value: {number: 8080}
+      - equal:
+          path: spec.rules[0].http.paths[1].backend.service.port
+          value: {name: admin}
+
+  - it: uses the served ExternalSecret API by default
+    template: templates/externalsecret.yaml
+    set:
+      externalSecret.enabled: true
+    asserts:
+      - equal:
+          path: apiVersion
+          value: external-secrets.io/v1
+
+  - it: refuses to let secret and externalSecret manage the same Secret
+    template: templates/externalsecret.yaml
+    set:
+      secret.enabled: true
+      externalSecret.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: secret and externalSecret both manage Secret
+
+  - it: allows secret and externalSecret with different Secret names
+    template: templates/externalsecret.yaml
+    set:
+      secret.enabled: true
+      externalSecret.enabled: true
+      externalSecret.target.name: from-vault
+    asserts:
+      - equal:
+          path: spec.target.name
+          value: from-vault
+
+  - it: keeps the test pod out of the application's selectors and runs it restricted
+    template: templates/tests/test-connection.yaml
+    asserts:
+      - notEqual:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: application-chart
+      - equal:
+          path: spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false

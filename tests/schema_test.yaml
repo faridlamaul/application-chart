@@ -1,0 +1,30 @@
+suite: values schema
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: rejects unknown top-level keys
+    set:
+      replicaCont: 3
+    asserts:
+      - failedTemplate:
+          errorPattern: replicaCont
+
+  - it: rejects unknown keys in chart-owned blocks
+    set:
+      service.typ: NodePort
+    asserts:
+      - failedTemplate:
+          errorPattern: typ
+
+  - it: rejects non-string ConfigMap data
+    set:
+      configMap.data.PORT: 8080
+    asserts:
+      - failedTemplate:
+          errorPattern: PORT
+
+  - it: rejects the latest image tag
+    set:
+      image.tag: latest
+    asserts:
+      - failedTemplate: {}

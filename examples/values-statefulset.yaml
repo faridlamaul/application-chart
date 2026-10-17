@@ -9,6 +9,16 @@ image:
   repository: redis
   tag: "7.2.5"
 
+# The redis image starts as root by default; run it as its redis user (999) so
+# it satisfies the chart's runAsNonRoot default. fsGroup makes /data writable.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 999
+  runAsGroup: 999
+  fsGroup: 999
+  seccompProfile:
+    type: RuntimeDefault
+
 containerPorts:
   - name: redis
     containerPort: 6379

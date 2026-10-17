@@ -1,4 +1,7 @@
-{{- if and .Values.autoscaling.enabled (eq .Values.workload.type "Deployment") }}
+{{- if and .Values.autoscaling.enabled (ne .Values.workload.type "Deployment") }}
+{{- fail (printf "autoscaling.enabled is supported only for workload.type Deployment, not %s" .Values.workload.type) }}
+{{- end }}
+{{- if .Values.autoscaling.enabled }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:

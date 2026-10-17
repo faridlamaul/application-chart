@@ -1,0 +1,60 @@
+suite: statefulset governing service
+templates:
+  - templates/statefulset.yaml
+  - templates/service-headless.yaml
+  - templates/service.yaml
+release:
+  name: app
+tests:
+  - it: governs the StatefulSet with a dedicated headless Service by default
+    set:
+      workload.type: StatefulSet
+    asserts:
+      - equal:
+          path: spec.serviceName
+          value: app-application-chart-headless
+        template: templates/statefulset.yaml
+      - equal:
+          path: spec.clusterIP
+          value: None
+        template: templates/service-headless.yaml
+      - equal:
+          path: metadata.name
+          value: app-application-chart-headless
+        template: templates/service-headless.yaml
+      - equal:
+          path: spec.ports[0]
+          value: {name: http, port: 8080, targetPort: http, protocol: TCP}
+        template: templates/service-headless.yaml
+
+  - it: uses the main Service when it is already headless
+    set:
+      workload.type: StatefulSet
+      service.headless: true
+    asserts:
+      - equal:
+          path: spec.serviceName
+          value: app-application-chart
+        template: templates/statefulset.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/service-headless.yaml
+
+  - it: uses statefulSet.serviceName as is and renders no headless Service
+    set:
+      workload.type: StatefulSet
+      statefulSet.serviceName: shared-headless
+    asserts:
+      - equal:
+          path: spec.serviceName
+          value: shared-headless
+        template: templates/statefulset.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/service-headless.yaml
+
+  - it: renders no headless Service for a Deployment
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/service-headless.yaml

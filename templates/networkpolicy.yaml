@@ -4,10 +4,7 @@ kind: NetworkPolicy
 metadata:
   name: {{ include "application-chart.fullname" . }}
   labels:
-    {{- include "application-chart.labels" . | nindent 4 }}
-    {{- with .Values.networkPolicy.labels }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
+    {{- include "application-chart.labelsWith" (dict "root" . "extra" .Values.networkPolicy.labels) | nindent 4 }}
 spec:
   podSelector:
     matchLabels:

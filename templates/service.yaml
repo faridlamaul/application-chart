@@ -4,10 +4,7 @@ kind: Service
 metadata:
   name: {{ include "application-chart.fullname" . }}
   labels:
-    {{- include "application-chart.labels" . | nindent 4 }}
-    {{- with .Values.service.labels }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
+    {{- include "application-chart.labelsWith" (dict "root" . "extra" .Values.service.labels) | nindent 4 }}
   {{- with .Values.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
