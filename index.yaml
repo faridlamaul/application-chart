@@ -3,7 +3,31 @@ entries:
   application-chart:
   - apiVersion: v2
     appVersion: 1.0.0
-    created: "2026-06-07T18:29:41.759823836Z"
+    created: "2026-10-17T20:34:46.796535116Z"
+    description: A generic, production-ready Helm chart for Kubernetes application
+      workloads
+    digest: 1708ae07299c96c2452d98d12649318e0bc1f7bf9cbeb75c5ce67046bdcc5b7c
+    home: https://github.com/faridlamaul/application-chart
+    keywords:
+    - application
+    - backend
+    - api
+    - worker
+    - cronjob
+    - kubernetes
+    kubeVersion: '>=1.25.0-0'
+    maintainers:
+    - name: Ahmad Lamaul Farid
+    name: application-chart
+    sources:
+    - https://github.com/faridlamaul/application-chart
+    type: application
+    urls:
+    - https://faridlamaul.github.io/application-chart/application-chart-0.3.0.tgz
+    version: 0.3.0
+  - apiVersion: v2
+    appVersion: 1.0.0
+    created: "2026-10-17T20:34:46.795588083Z"
     description: A generic, production-ready Helm chart for Kubernetes application
       workloads
     digest: e59a73374b4255de28cf9b52ef17382c75de25f7ec70b083fb20d5c6a0a1e2b3
@@ -22,4 +46,4 @@ entries:
     urls:
     - https://faridlamaul.github.io/application-chart/application-chart-0.2.0.tgz
     version: 0.2.0
-generated: "2026-06-07T18:29:41.758643644Z"
+generated: "2026-10-17T20:34:46.794301152Z"
