@@ -1,0 +1,12 @@
+version: 2
+
+# Chart releases follow the version in Chart.yaml, not commit types, so these
+# updates only touch CI. The helm-unittest image runs inside a run: step,
+# which Dependabot does not read, so it is bumped by hand.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci(deps)

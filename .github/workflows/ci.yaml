@@ -58,6 +58,7 @@ jobs:
 
       # The image's default user (uid 1000) cannot write to the runner's
       # checkout, so run as the runner's user with a writable HOME.
+      # Dependabot does not update images in run:, so bump tag and digest by hand.
       - name: Unit tests
         run: >
           docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/apps"
