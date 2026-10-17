@@ -103,7 +103,7 @@ jobs:
             --set service.enabled=false --wait --timeout 3m)
           helm install batch . "${job_args[@]}"
           kubectl wait --for=condition=complete job/batch-application-chart --timeout=60s
-          helm upgrade batch . "${job_args[@]}" --set 'job.env[0].name=RUN' --set 'job.env[0].value=2'
+          helm upgrade batch . "${job_args[@]}" --set 'job.env[0].name=RUN' --set-string 'job.env[0].value=2'
           kubectl get job batch-application-chart -o jsonpath='{.spec.template.spec.containers[0].env[0].value}' | grep -x 2
 
       - name: Diagnostics on failure
