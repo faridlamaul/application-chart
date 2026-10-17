@@ -1,0 +1,126 @@
+suite: workloads
+templates:
+  - templates/deployment.yaml
+  - templates/job.yaml
+  - templates/cronjob.yaml
+  - templates/configmap.yaml
+  - templates/secret.yaml
+tests:
+  - it: renders rollingUpdate only for the RollingUpdate strategy
+    template: templates/deployment.yaml
+    set:
+      deploymentStrategy:
+        type: Recreate
+    asserts:
+      - equal:
+          path: spec.strategy
+          value:
+            type: Recreate
+
+  - it: keeps rollingUpdate settings for RollingUpdate
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.strategy.rollingUpdate.maxUnavailable
+          value: 0
+
+  - it: sets automountServiceAccountToken on the pod from serviceAccount.automount
+    template: templates/deployment.yaml
+    set:
+      serviceAccount.automount: true
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+
+  - it: renders terminationGracePeriodSeconds 0
+    template: templates/deployment.yaml
+    set:
+      terminationGracePeriodSeconds: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.terminationGracePeriodSeconds
+          value: 0
+
+  - it: lets resource labels replace standard labels without duplicating them, but never the selector labels
+    template: templates/deployment.yaml
+    set:
+      labels:
+        app.kubernetes.io/part-of: payments
+        app.kubernetes.io/name: hijacked
+        team: core
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/part-of"]
+          value: payments
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: application-chart
+      - equal:
+          path: metadata.labels.team
+          value: core
+
+  - it: runs the Job as a Helm hook and keeps user annotations
+    template: templates/job.yaml
+    set:
+      workload.type: Job
+      job.annotations:
+        owner: data
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-install,post-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+      - equal:
+          path: metadata.annotations.owner
+          value: data
+
+  - it: renders ttlSecondsAfterFinished 0 for a Job
+    template: templates/job.yaml
+    set:
+      workload.type: Job
+      job.ttlSecondsAfterFinished: 0
+    asserts:
+      - equal:
+          path: spec.ttlSecondsAfterFinished
+          value: 0
+
+  - it: does not copy the service probes into Job containers
+    template: templates/job.yaml
+    set:
+      workload.type: Job
+      readinessProbe: {enabled: true, httpGet: {path: /ready, port: http}}
+      livenessProbe: {enabled: true, httpGet: {path: /live, port: http}}
+      startupProbe: {enabled: true, httpGet: {path: /live, port: http}}
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].readinessProbe
+      - notExists:
+          path: spec.template.spec.containers[0].livenessProbe
+      - notExists:
+          path: spec.template.spec.containers[0].startupProbe
+      - notExists:
+          path: spec.template.spec.containers[0].ports
+
+  - it: does not copy the service probes into CronJob containers
+    template: templates/cronjob.yaml
+    set:
+      workload.type: CronJob
+      readinessProbe: {enabled: true, httpGet: {path: /ready, port: http}}
+      livenessProbe: {enabled: true, httpGet: {path: /live, port: http}}
+    asserts:
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.containers[0].readinessProbe
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.containers[0].livenessProbe
+
+  - it: still applies probes to Deployment containers
+    template: templates/deployment.yaml
+    set:
+      readinessProbe: {enabled: true, httpGet: {path: /ready, port: http}}
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /ready

@@ -29,12 +29,13 @@ spec:
               service:
                 name: {{ include "application-chart.fullname" $ }}
                 port:
-                  {{- if kindIs "float64" .servicePort }}
-                  number: {{ .servicePort | int }}
-                  {{- else if kindIs "int" .servicePort }}
-                  number: {{ .servicePort }}
+                  {{- /* --set yields int64 and YAML yields float64, so test for a string instead. */}}
+                  {{- if kindIs "string" .servicePort }}
+                  name: {{ .servicePort }}
+                  {{- else if .servicePort }}
+                  number: {{ int .servicePort }}
                   {{- else }}
-                  name: {{ default "http" .servicePort }}
+                  name: http
                   {{- end }}
           {{- end }}
     {{- end }}

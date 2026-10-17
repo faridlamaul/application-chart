@@ -15,7 +15,11 @@ spec:
   {{- end }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   strategy:
-    {{- toYaml .Values.deploymentStrategy | nindent 4 }}
+    type: {{ .Values.deploymentStrategy.type }}
+    {{- if and (eq .Values.deploymentStrategy.type "RollingUpdate") .Values.deploymentStrategy.rollingUpdate }}
+    rollingUpdate:
+      {{- toYaml .Values.deploymentStrategy.rollingUpdate | nindent 6 }}
+    {{- end }}
   selector:
     matchLabels:
       {{- include "application-chart.selectorLabels" . | nindent 6 }}

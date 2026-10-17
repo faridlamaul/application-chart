@@ -14,7 +14,7 @@ The design principle is:
 - Service, Ingress, HPA, PDB, NetworkPolicy, ServiceMonitor, ConfigMap, Secret, ExternalSecret, ServiceAccount, and RBAC
 - Secure-by-default pod and container security context
 - GitOps-friendly deterministic manifests
-- `values.schema.json` validation for high-risk values
+- `values.schema.json` validation: unknown keys and wrong value shapes fail at render time
 - Example values files for common production patterns
 
 ## Chart Structure
@@ -25,11 +25,13 @@ application-chart/
   values.yaml
   values.schema.json
   README.md
+  CHANGELOG.md
   examples/
   templates/
     _helpers.tpl
     deployment.yaml
     service.yaml
+    service-headless.yaml   # StatefulSet governing Service
     ingress.yaml
     serviceaccount.yaml
     rbac.yaml
@@ -44,26 +46,42 @@ application-chart/
     job.yaml
     cronjob.yaml
     tests/
-      test-connection.yaml
+      test-connection.yaml  # `helm test` hook
+  tests/                    # helm-unittest suites (not packaged)
 ```
 
 ## Installation
 
+From GHCR (OCI):
+
 ```bash
-helm upgrade --install user-api ./helm-chart/application-chart \
+helm upgrade --install user-api oci://ghcr.io/faridlamaul/charts/application-chart \
+  --version 0.3.0 \
   --namespace applications \
   --create-namespace \
-  -f ./helm-chart/application-chart/examples/values-api.yaml
+  -f values-user-api.yaml
 ```
+
+From the Helm repository:
+
+```bash
+helm repo add application-chart https://faridlamaul.github.io/application-chart
+helm upgrade --install user-api application-chart/application-chart \
+  --version 0.3.0 --namespace applications --create-namespace -f values-user-api.yaml
+```
+
+With no values file, the chart deploys `nginxinc/nginx-unprivileged` on port 8080 as a non-root user, which is useful to check a cluster before deploying a real image.
 
 ## Upgrade
 
+Read [CHANGELOG.md](CHANGELOG.md) before upgrading across minor versions; 0.3.0 has upgrade steps.
+
 ```bash
-helm diff upgrade user-api ./helm-chart/application-chart \
+helm diff upgrade user-api oci://ghcr.io/faridlamaul/charts/application-chart --version 0.3.0 \
   --namespace applications \
   -f values-user-api.yaml
 
-helm upgrade --install user-api ./helm-chart/application-chart \
+helm upgrade --install user-api oci://ghcr.io/faridlamaul/charts/application-chart --version 0.3.0 \
   --namespace applications \
   -f values-user-api.yaml
 ```
@@ -139,9 +157,30 @@ cronjob:
     - /app/export-reports
 ```
 
+CronJob and Job containers do not get `livenessProbe`, `readinessProbe`, or `startupProbe`, and expose no ports.
+
+## Job Example
+
+A Job's pod template is immutable, so `workload.type: Job` renders the Job as a Helm `post-install,post-upgrade` hook. Every install and upgrade replaces the previous Job and runs it again, and `helm install`/`upgrade` waits for it to finish: raise `--timeout` for long jobs. Because it is a hook, `helm uninstall` does not delete it; `job.ttlSecondsAfterFinished` (default 300) cleans it up.
+
+```yaml
+workload:
+  type: Job
+
+service:
+  enabled: false
+
+job:
+  command:
+    - /app/migrate
+  backoffLimit: 2
+```
+
 ## StatefulSet Example
 
 Use `StatefulSet` for workloads that need stable pod identity or stable per-pod storage. This chart can run simple stateful workloads, but production databases should normally use a managed database service or a database-specific operator.
+
+A StatefulSet needs a headless governing Service for stable per-pod DNS (`<pod>.<service>`). When the main Service is not headless, the chart renders `<fullname>-headless` (`clusterIP: None`, `publishNotReadyAddresses: true`) and uses it as `spec.serviceName`. Set `service.headless: true` to make the main Service the governing one, as below, or `statefulSet.serviceName` to use a Service managed elsewhere.
 
 ```yaml
 workload:
@@ -199,7 +238,7 @@ ingress:
 
 ## HPA Example
 
-When HPA is enabled, the Deployment does not render `spec.replicas`. The HPA controls replica count.
+When HPA is enabled, the Deployment does not render `spec.replicas`. The HPA controls replica count. HPA is supported for `workload.type: Deployment` only; enabling it for another workload type fails the render.
 
 ```yaml
 autoscaling:
@@ -213,6 +252,8 @@ autoscaling:
 ## ExternalSecret Example
 
 Prefer External Secrets Operator, Sealed Secrets, or another secret manager integration for production secrets. Do not commit real secrets to `values.yaml`.
+
+The default `externalSecret.apiVersion` is `external-secrets.io/v1`; ESO stopped serving `v1beta1` in v0.17.0. The target Secret defaults to the same name as `secret.name`, so enabling `secret` and `externalSecret` together fails unless their names differ.
 
 ```yaml
 externalSecret:
@@ -234,8 +275,8 @@ externalSecret:
 
 - Pin image tags and avoid `latest`
 - Use private registry pull secrets where needed
-- Keep `serviceAccount.automount: false` unless the pod must call the Kubernetes API
-- Enable RBAC only with least-privilege `Role` rules
+- Keep `serviceAccount.automount: false` unless the pod must call the Kubernetes API; the value applies to the ServiceAccount and to the pod
+- Enable RBAC only with least-privilege `Role` rules, and set `serviceAccount.automount: true` so the pod gets a token to use them
 - Prefer ExternalSecret over chart-rendered Secret objects
 - Review `readOnlyRootFilesystem` per application because some runtimes need writable temp directories
 - Use NetworkPolicy in clusters with a policy-enforcing CNI
@@ -288,6 +329,8 @@ spec:
       selfHeal: true
 ```
 
+Argo CD maps Helm hooks to its own: a `workload.type: Job` release runs as a PostSync hook on every sync.
+
 Flux example:
 
 ```yaml
@@ -313,50 +356,16 @@ spec:
 ## Validation Commands
 
 ```bash
-helm lint helm-chart/application-chart
-helm template test helm-chart/application-chart
-helm template api helm-chart/application-chart -f helm-chart/application-chart/examples/values-api.yaml
-helm template worker helm-chart/application-chart -f helm-chart/application-chart/examples/values-worker.yaml
-helm template cronjob helm-chart/application-chart -f helm-chart/application-chart/examples/values-cronjob.yaml
-helm template statefulset helm-chart/application-chart -f helm-chart/application-chart/examples/values-statefulset.yaml
-helm template public helm-chart/application-chart -f helm-chart/application-chart/examples/values-public-ingress.yaml
-helm template secure helm-chart/application-chart -f helm-chart/application-chart/examples/values-secure-production.yaml
+helm lint . --strict
+for f in examples/*.yaml; do helm lint . --strict -f "$f"; done
+helm template app . -f examples/values-api.yaml
+docker run --rm -v "$PWD:/apps" helmunittest/helm-unittest:4.3.0-1.2.1 .   # unit tests in tests/
 ```
 
-## CI Usage
+## CI and Publishing
 
-This chart repository consumes reusable GitHub Actions workflows from `faridlamaul/ci-template` instead of duplicating pipeline logic per repository.
-
-Lint workflow:
-
-```yaml
-name: Helm Lint
-
-jobs:
-  helm-lint:
-    uses: faridlamaul/ci-template/.github/workflows/helm-lint.yaml@main
-    with:
-      chart_dir: "."
-      release_name: "application-chart"
-      render_value_files: "examples/values-api.yaml examples/values-worker.yaml examples/values-cronjob.yaml examples/values-statefulset.yaml examples/values-internal-service.yaml examples/values-public-ingress.yaml examples/values-secure-production.yaml"
-```
-
-GitHub Pages publishing workflow:
-
-
-```yaml
-name: Publish Helm Chart
-
-jobs:
-  publish:
-    uses: faridlamaul/ci-template/.github/workflows/publish-gh-pages.yaml@main
-    with:
-      chart_dir: "."
-      helm_repo_url: "https://faridlamaul.github.io/application-chart"
-      publish_branch: "gh-pages"
-```
-
-The local workflow files live under `.github/workflows/` and call the shared reusable workflows from `faridlamaul/ci-template`.
+- **`ci.yaml`** (pull requests, and before every publish): `helm lint --strict` and rendering of the defaults and every example with Helm 3 and Helm 4; kubeconform against Kubernetes 1.25 and 1.33 (including the ExternalSecret and ServiceMonitor CRDs); the helm-unittest suites; and a kind cluster that installs the defaults (plus `helm test`), a StatefulSet (per-pod DNS), the Redis example, and a Job that is upgraded with a changed pod template.
+- **`publish.yaml`** (every push to `main`): runs CI, then publishes only when the `version` in `Chart.yaml` has no `application-chart-<version>` tag yet. It pushes the chart to `oci://ghcr.io/faridlamaul/charts`, adds it to the GitHub Pages repository, and creates the tag with a GitHub Release. Bump `version` in `Chart.yaml` and add a CHANGELOG entry to release.
 
 ## Common Troubleshooting
 
@@ -365,15 +374,18 @@ The local workflow files live under `.github/workflows/` and call the shared reu
 | `values don't meet the specifications` | Invalid value rejected by `values.schema.json` | Fix the value shape before rendering |
 | Ingress is not rendered | `ingress.enabled`, `service.enabled`, or `workload.type` is not compatible | Use `workload.type: Deployment` or `StatefulSet` and enable Service |
 | HPA rendered but pods do not scale | Metrics Server or Prometheus adapter is missing | Check HPA events with `kubectl describe hpa` |
-| PDB render fails | Both `minAvailable` and `maxUnavailable` are set | Set only one field |
-| Pod cannot start as non-root | Image requires root user | Fix the image or override security context explicitly |
+| PDB render fails | Both `minAvailable` and `maxUnavailable` are set | Set only one field; with neither, `minAvailable: 1` is used |
+| `additional properties '…' not allowed` | Unknown or misspelled key in values | Fix the key; the schema rejects keys the chart does not read |
+| `autoscaling.enabled is supported only for workload.type Deployment` | HPA enabled for a StatefulSet, Job, or CronJob | Disable autoscaling or switch to a Deployment |
+| Pod cannot start as non-root | Image requires root user | Use a non-root image, or set `podSecurityContext.runAsUser` to the image's unprivileged user |
+| `helm test` times out | A NetworkPolicy blocks the test pod | Set `tests.enabled: false` or allow ingress from pods labeled `app.kubernetes.io/component: test` |
 | ServiceMonitor is ignored | Prometheus Operator selectors do not match labels | Add the required release/team labels under `serviceMonitor.labels` |
 
 ## Design Decisions
 
 - One release manages one main workload type. This avoids making Deployment, StatefulSet, Job, and CronJob logic compete in the same release.
 - Templates use Kubernetes-native value shapes where possible, for example `env`, `envFrom`, probes, volumes, and security contexts.
-- Service, Ingress, PDB, ServiceMonitor, and tests support Deployment and StatefulSet workloads. HPA remains Deployment-only.
+- Service, Ingress, PDB, ServiceMonitor, and tests support Deployment and StatefulSet workloads. HPA is Deployment-only and fails the render for other workload types.
 - Secrets are supported for development and simple internal use, but ExternalSecret is the recommended production path.
 - Kong, Istio, VPA, and cloud-provider-specific resources are intentionally excluded from the base chart. Add them as overlays or separate platform charts.
 

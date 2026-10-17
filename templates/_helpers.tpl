@@ -32,17 +32,27 @@ Create chart name and version label value.
 Common labels.
 */}}
 {{- define "application-chart.labels" -}}
-helm.sh/chart: {{ include "application-chart.chart" . }}
-{{ include "application-chart.selectorLabels" . }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- include "application-chart.labelsWith" (dict "root" . "extra" dict) -}}
+{{- end -}}
+
+{{/*
+Common labels plus a resource's own labels. Precedence: selector labels (never
+replaced), then the resource's labels, then .Values.labels, then the standard
+labels, so overrides replace keys instead of duplicating them.
+*/}}
+{{- define "application-chart.labelsWith" -}}
+{{- $root := .root -}}
+{{- $standard := dict
+  "helm.sh/chart" (include "application-chart.chart" $root)
+  "app.kubernetes.io/component" (default "application" $root.Values.component)
+  "app.kubernetes.io/part-of" (default (include "application-chart.name" $root) $root.Values.partOf)
+  "app.kubernetes.io/managed-by" $root.Release.Service -}}
+{{- with $root.Chart.AppVersion }}
+{{- $_ := set $standard "app.kubernetes.io/version" . }}
 {{- end }}
-app.kubernetes.io/component: {{ default "application" .Values.component | quote }}
-app.kubernetes.io/part-of: {{ default (include "application-chart.name" .) .Values.partOf | quote }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- with .Values.labels }}
-{{ toYaml . }}
-{{- end }}
+{{- $selector := include "application-chart.selectorLabels" $root | fromYaml -}}
+{{- $labels := merge $selector (deepCopy (.extra | default dict)) (deepCopy ($root.Values.labels | default dict)) $standard -}}
+{{- toYaml $labels -}}
 {{- end -}}
 
 {{/*
@@ -61,6 +71,20 @@ ServiceAccount name.
 {{- default (include "application-chart.fullname" .) .Values.serviceAccount.name -}}
 {{- else -}}
 {{- default "default" .Values.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Governing Service of a StatefulSet. It must be headless for stable per-pod DNS:
+the main Service when it is headless, otherwise the chart's -headless Service.
+*/}}
+{{- define "application-chart.statefulSetServiceName" -}}
+{{- if .Values.statefulSet.serviceName -}}
+{{- .Values.statefulSet.serviceName -}}
+{{- else if and .Values.service.enabled .Values.service.headless -}}
+{{- include "application-chart.fullname" . -}}
+{{- else -}}
+{{- printf "%s-headless" (include "application-chart.fullname" . | trunc 54 | trimSuffix "-") -}}
 {{- end -}}
 {{- end -}}
 
@@ -102,9 +126,10 @@ ServiceAccount name.
 {{- $volumeMounts := concat ($root.Values.volumeMounts | default list) ($container.volumeMounts | default list) -}}
 {{- $command := default $root.Values.command $container.command -}}
 {{- $args := default $root.Values.args $container.args -}}
-{{- $livenessProbe := default $root.Values.livenessProbe $container.livenessProbe -}}
-{{- $readinessProbe := default $root.Values.readinessProbe $container.readinessProbe -}}
-{{- $startupProbe := default $root.Values.startupProbe $container.startupProbe -}}
+{{- /* A key present in the container overrides the root value, even when empty. */ -}}
+{{- $livenessProbe := ternary $container.livenessProbe $root.Values.livenessProbe (hasKey $container "livenessProbe") -}}
+{{- $readinessProbe := ternary $container.readinessProbe $root.Values.readinessProbe (hasKey $container "readinessProbe") -}}
+{{- $startupProbe := ternary $container.startupProbe $root.Values.startupProbe (hasKey $container "startupProbe") -}}
 {{- $securityContext := default $root.Values.securityContext $container.securityContext -}}
 {{- $lifecycle := default $root.Values.lifecycle $container.lifecycle -}}
 - name: {{ default (include "application-chart.name" $root) $container.name }}
@@ -169,6 +194,7 @@ imagePullSecrets:
 {{ toYaml . | nindent 2 }}
 {{- end }}
 serviceAccountName: {{ include "application-chart.serviceAccountName" $root }}
+automountServiceAccountToken: {{ $root.Values.serviceAccount.automount }}
 {{- with $root.Values.podSecurityContext }}
 securityContext:
 {{ toYaml . | nindent 2 }}
@@ -209,7 +235,7 @@ tolerations:
 topologySpreadConstraints:
 {{ toYaml . | nindent 2 }}
 {{- end }}
-{{- with $root.Values.terminationGracePeriodSeconds }}
-terminationGracePeriodSeconds: {{ . }}
+{{- if not (kindIs "invalid" $root.Values.terminationGracePeriodSeconds) }}
+terminationGracePeriodSeconds: {{ $root.Values.terminationGracePeriodSeconds }}
 {{- end }}
 {{- end -}}

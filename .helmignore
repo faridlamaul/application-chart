@@ -7,3 +7,5 @@
 *.swp
 *.tmp
 *.bak
+# helm-unittest suites; a bare "tests/" would also drop templates/tests/
+tests/*_test.yaml

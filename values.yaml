@@ -12,7 +12,9 @@ replicaCount: 2
 revisionHistoryLimit: 10
 
 image:
-  repository: nginx
+  # Runs as a non-root user (uid 101) and listens on 8080, matching the default
+  # containerPorts and podSecurityContext.runAsNonRoot.
+  repository: nginxinc/nginx-unprivileged
   tag: "1.27"
   pullPolicy: IfNotPresent
 
@@ -49,6 +51,10 @@ podAnnotations: {}
 podLabels: {}
 annotations: {}
 labels: {}
+# Values for the app.kubernetes.io/component and app.kubernetes.io/part-of
+# labels; default to "application" and the chart name.
+component: ""
+partOf: ""
 
 podSecurityContext:
   runAsNonRoot: true
@@ -64,6 +70,8 @@ securityContext:
 
 serviceAccount:
   create: true
+  # Set on the ServiceAccount and on the pod. Must be true for rbac rules to be
+  # usable from the pod.
   automount: false
   annotations: {}
   name: ""
@@ -118,7 +126,7 @@ secret:
 
 externalSecret:
   enabled: false
-  apiVersion: external-secrets.io/v1beta1
+  apiVersion: external-secrets.io/v1
   refreshInterval: 1h
   secretStoreRef:
     name: default-secret-store
@@ -140,8 +148,9 @@ autoscaling:
 
 podDisruptionBudget:
   enabled: false
-  minAvailable: 1
-  maxUnavailable: ""
+  # Set one of the two; minAvailable defaults to 1 when both are null.
+  minAvailable: null
+  maxUnavailable: null
 
 networkPolicy:
   enabled: false
@@ -191,8 +200,10 @@ volumeMounts: []
 initContainers: []
 extraContainers: []
 
+# Used when workload.type is Job. The Job runs as a Helm post-install and
+# post-upgrade hook, so `helm install`/`upgrade` waits for it (see --timeout)
+# and every upgrade runs it again. Probes are not applied to batch containers.
 job:
-  enabled: true
   annotations: {}
   labels: {}
   backoffLimit: 6
@@ -205,8 +216,8 @@ job:
   envFrom: []
   resources: {}
 
+# Used when workload.type is CronJob. Probes are not applied to batch containers.
 cronjob:
-  enabled: true
   annotations: {}
   labels: {}
   schedule: "*/5 * * * *"

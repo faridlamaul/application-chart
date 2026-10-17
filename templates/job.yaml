@@ -4,21 +4,22 @@ kind: Job
 metadata:
   name: {{ include "application-chart.fullname" . }}
   labels:
-    {{- include "application-chart.labels" . | nindent 4 }}
-    {{- with .Values.job.labels }}
+    {{- include "application-chart.labelsWith" (dict "root" . "extra" .Values.job.labels) | nindent 4 }}
+  # A Job's pod template is immutable, so the Job runs as a Helm hook: each
+  # install and upgrade replaces it and runs it again.
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+    {{- with .Values.job.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
-  {{- with .Values.job.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
 spec:
   backoffLimit: {{ .Values.job.backoffLimit }}
   {{- with .Values.job.activeDeadlineSeconds }}
   activeDeadlineSeconds: {{ . }}
   {{- end }}
-  {{- with .Values.job.ttlSecondsAfterFinished }}
-  ttlSecondsAfterFinished: {{ . }}
+  {{- if not (kindIs "invalid" .Values.job.ttlSecondsAfterFinished) }}
+  ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
   {{- end }}
   template:
     metadata:
@@ -32,7 +33,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      {{- $container := dict "command" .Values.job.command "args" .Values.job.args "env" .Values.job.env "envFrom" .Values.job.envFrom "resources" .Values.job.resources "ports" (list) -}}
+      {{- $container := dict "command" .Values.job.command "args" .Values.job.args "env" .Values.job.env "envFrom" .Values.job.envFrom "resources" .Values.job.resources "ports" (list) "livenessProbe" (dict) "readinessProbe" (dict) "startupProbe" (dict) -}}
       {{- include "application-chart.podSpec" (dict "root" . "container" $container "restartPolicy" .Values.job.restartPolicy) | nindent 6 }}
 {{- end }}
 

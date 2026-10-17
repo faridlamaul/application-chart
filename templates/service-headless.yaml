@@ -1,0 +1,28 @@
+{{- /*
+Headless governing Service for a StatefulSet, required for stable per-pod DNS
+(<pod>.<service>). Not rendered when the main Service is already headless or
+statefulSet.serviceName points to a Service managed elsewhere.
+*/ -}}
+{{- if and (eq .Values.workload.type "StatefulSet") (not .Values.statefulSet.serviceName) (not (and .Values.service.enabled .Values.service.headless)) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "application-chart.statefulSetServiceName" . }}
+  labels:
+    {{- include "application-chart.labelsWith" (dict "root" . "extra" (dict "application-chart/governing-service" "true")) | nindent 4 }}
+spec:
+  clusterIP: None
+  # Peers can resolve each other before they are ready, e.g. to form a cluster.
+  publishNotReadyAddresses: true
+  {{- with .Values.containerPorts }}
+  ports:
+    {{- range . }}
+    - name: {{ .name }}
+      port: {{ .containerPort }}
+      targetPort: {{ .name }}
+      protocol: {{ default "TCP" .protocol }}
+    {{- end }}
+  {{- end }}
+  selector:
+    {{- include "application-chart.selectorLabels" . | nindent 4 }}
+{{- end }}

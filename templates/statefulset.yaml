@@ -10,7 +10,7 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  serviceName: {{ default (include "application-chart.fullname" .) .Values.statefulSet.serviceName }}
+  serviceName: {{ include "application-chart.statefulSetServiceName" . }}
   replicas: {{ .Values.replicaCount }}
   podManagementPolicy: {{ .Values.statefulSet.podManagementPolicy }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
