@@ -85,8 +85,9 @@ jobs:
       - name: StatefulSet pods resolve through the headless governing Service
         run: |
           helm install db . --set workload.type=StatefulSet --set replicaCount=1 --wait --timeout 3m
+          # busybox nslookup ignores the search domains, so use the full name.
           kubectl run dns-check --image=busybox:1.36 --restart=Never --rm -i --quiet -- \
-            nslookup db-application-chart-0.db-application-chart-headless
+            nslookup db-application-chart-0.db-application-chart-headless.default.svc.cluster.local
 
       - name: Redis StatefulSet example runs as non-root with storage
         run: |
