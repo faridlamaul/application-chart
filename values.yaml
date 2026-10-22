@@ -297,6 +297,56 @@ cronjob:
   envFrom: []
   resources: {}
 
+# Companion Jobs, rendered next to the main workload. Each key names one Job,
+# <fullname>-<key>; keys match ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ and the name
+# must fit in 63 characters. A companion inherits the root image, imagePullSecrets,
+# env, envFrom, volumes, volumeMounts, podSecurityContext, securityContext,
+# nodeSelector, tolerations, affinity and tmpDir. It does not get probes,
+# lifecycle, containerPorts, initContainers, extraContainers or persistence.
+# Its pods carry app.kubernetes.io/name: <name>-<key>, so the main Service,
+# PodDisruptionBudget and NetworkPolicy do not select them.
+# A hook that includes pre-install runs before the chart's ConfigMap, Secret,
+# ExternalSecret and ServiceAccount exist: reference existing Secrets, and it
+# runs as the "default" ServiceAccount unless serviceAccountName is set.
+# Without a hook the Job is a plain resource; its pod template is immutable,
+# so changing it fails the upgrade.
+jobs: {}
+#  migrate:
+#    enabled: true
+#    hook: pre-install,pre-upgrade   # empty: a plain Job
+#    hookWeight: "0"
+#    hookDeletePolicy: before-hook-creation,hook-succeeded
+#    serviceAccountName: ""          # empty: see above
+#    image: {}                       # empty: .Values.image; else repository and tag
+#    command: []                     # empty: .Values.command
+#    args: []                        # empty: .Values.args
+#    env: []                         # appended to .Values.env
+#    envFrom: []                     # appended to .Values.envFrom
+#    resources: {}                   # empty: .Values.resources
+#    securityContext: {}             # empty: .Values.securityContext; else replaces it
+#    backoffLimit: 3
+#    activeDeadlineSeconds: null
+#    ttlSecondsAfterFinished: 300
+#    restartPolicy: Never
+#    annotations: {}
+#    labels: {}
+#    podAnnotations: {}
+
+# Companion CronJobs. Same rules as jobs, except the name must fit in 52
+# characters (the controller appends a suffix to each Job) and there are no
+# hooks.
+cronJobs: {}
+#  cleanup:
+#    enabled: true
+#    schedule: "0 3 * * *"
+#    timeZone: ""                    # e.g. Asia/Jakarta; empty: the controller's zone
+#    concurrencyPolicy: Forbid
+#    suspend: false
+#    successfulJobsHistoryLimit: 3
+#    failedJobsHistoryLimit: 1
+#    startingDeadlineSeconds: null
+#    (plus every jobs field except hook, hookWeight and hookDeletePolicy)
+
 tests:
   enabled: true
   image:

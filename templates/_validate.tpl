@@ -28,4 +28,14 @@ on each render. Renders nothing; calls `fail` on invalid combinations.
 {{- end -}}
 {{- end -}}
 {{- end -}}
+{{- range $kind, $max := dict "jobs" 63 "cronJobs" 52 -}}
+{{- range $key, $entry := (index $.Values $kind | default dict) -}}
+{{- if $entry.enabled -}}
+{{- $name := include "shipform.companionName" (dict "root" $ "key" $key) -}}
+{{- if gt (len $name) $max -}}
+{{- fail (printf "%s.%s: name %s exceeds %d characters; shorten the key or set fullnameOverride" $kind $key $name $max) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}

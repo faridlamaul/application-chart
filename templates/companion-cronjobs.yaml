@@ -1,0 +1,48 @@
+{{- range $key, $cron := .Values.cronJobs }}
+{{- if $cron.enabled }}
+{{- $selector := include "shipform.companionSelectorLabels" (dict "root" $ "key" $key) }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "shipform.companionName" (dict "root" $ "key" $key) }}
+  labels:
+    {{- include "shipform.labelsWith" (dict "root" $ "extra" $cron.labels "selector" $selector) | nindent 4 }}
+  {{- with $cron.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  schedule: {{ $cron.schedule | quote }}
+  {{- with $cron.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  concurrencyPolicy: {{ default "Forbid" $cron.concurrencyPolicy }}
+  suspend: {{ ternary $cron.suspend false (hasKey $cron "suspend") }}
+  successfulJobsHistoryLimit: {{ ternary $cron.successfulJobsHistoryLimit 3 (hasKey $cron "successfulJobsHistoryLimit") }}
+  failedJobsHistoryLimit: {{ ternary $cron.failedJobsHistoryLimit 1 (hasKey $cron "failedJobsHistoryLimit") }}
+  {{- with $cron.startingDeadlineSeconds }}
+  startingDeadlineSeconds: {{ . }}
+  {{- end }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ ternary $cron.backoffLimit 3 (hasKey $cron "backoffLimit") }}
+      {{- with $cron.activeDeadlineSeconds }}
+      activeDeadlineSeconds: {{ . }}
+      {{- end }}
+      {{- $ttl := ternary $cron.ttlSecondsAfterFinished 300 (hasKey $cron "ttlSecondsAfterFinished") }}
+      {{- if not (kindIs "invalid" $ttl) }}
+      ttlSecondsAfterFinished: {{ $ttl }}
+      {{- end }}
+      template:
+        metadata:
+          labels:
+            {{- $selector | nindent 12 }}
+          {{- with $cron.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        spec:
+          {{- include "shipform.companionPodSpec" (dict "root" $ "job" $cron) | nindent 10 }}
+{{- end }}
+{{- end }}

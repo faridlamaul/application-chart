@@ -8,7 +8,8 @@ Common labels.
 {{/*
 Common labels plus a resource's own labels. Precedence: selector labels (never
 replaced), then the resource's labels, then .Values.labels, then the standard
-labels, so overrides replace keys instead of duplicating them.
+labels, so overrides replace keys instead of duplicating them. An optional
+"selector" (YAML string) replaces shipform.selectorLabels, for companions.
 */}}
 {{- define "shipform.labelsWith" -}}
 {{- $root := .root -}}
@@ -20,7 +21,7 @@ labels, so overrides replace keys instead of duplicating them.
 {{- with $root.Chart.AppVersion }}
 {{- $_ := set $standard "app.kubernetes.io/version" . }}
 {{- end }}
-{{- $selector := include "shipform.selectorLabels" $root | fromYaml -}}
+{{- $selector := .selector | default (include "shipform.selectorLabels" $root) | fromYaml -}}
 {{- $labels := merge $selector (deepCopy (.extra | default dict)) (deepCopy ($root.Values.labels | default dict)) $standard -}}
 {{- toYaml $labels -}}
 {{- end -}}
@@ -31,4 +32,15 @@ Selector labels must remain stable across upgrades.
 {{- define "shipform.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "shipform.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}
+
+{{/*
+Selector labels of a companion Job or CronJob pod. The name differs from the
+main workload, so the main Service, PodDisruptionBudget and NetworkPolicy do
+not select companion pods. Takes (dict "root" $ "key" <key>).
+*/}}
+{{- define "shipform.companionSelectorLabels" -}}
+app.kubernetes.io/name: {{ printf "%s-%s" (include "shipform.name" .root) .key | trunc 63 | trimSuffix "-" }}
+app.kubernetes.io/instance: {{ .root.Release.Name }}
+app.kubernetes.io/component: {{ .key }}
 {{- end -}}

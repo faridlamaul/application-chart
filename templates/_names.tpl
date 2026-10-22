@@ -68,3 +68,35 @@ the main Service when it is headless, otherwise the chart's -headless Service.
 {{- define "shipform.persistenceClaimName" -}}
 {{- default (printf "%s-data" (include "shipform.fullname" . | trunc 58 | trimSuffix "-")) .Values.persistence.existingClaim -}}
 {{- end -}}
+
+{{/*
+Companion Job or CronJob name: <fullname>-<key>. Not truncated; shipform.validate
+fails instead, so two keys can never collide. Takes (dict "root" $ "key" <key>).
+*/}}
+{{- define "shipform.companionName" -}}
+{{- printf "%s-%s" (include "shipform.fullname" .root) .key -}}
+{{- end -}}
+
+{{/*
+ServiceAccount of a companion. Takes (dict "root" $ "job" <entry>). An explicit
+serviceAccountName wins. A hook that includes pre-install runs before the
+chart's ServiceAccount exists, so it uses "default" when serviceAccount.create
+is true. Every other companion uses shipform.serviceAccountName.
+*/}}
+{{- define "shipform.companionServiceAccountName" -}}
+{{- $root := .root -}}
+{{- $job := .job -}}
+{{- $preInstall := false -}}
+{{- range (splitList "," (toString (default "" $job.hook))) -}}
+{{- if eq (trim .) "pre-install" -}}
+{{- $preInstall = true -}}
+{{- end -}}
+{{- end -}}
+{{- if $job.serviceAccountName -}}
+{{- $job.serviceAccountName -}}
+{{- else if and $preInstall $root.Values.serviceAccount.create -}}
+default
+{{- else -}}
+{{- include "shipform.serviceAccountName" $root -}}
+{{- end -}}
+{{- end -}}

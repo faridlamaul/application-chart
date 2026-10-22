@@ -1,0 +1,41 @@
+{{- range $key, $job := .Values.jobs }}
+{{- if $job.enabled }}
+{{- $selector := include "shipform.companionSelectorLabels" (dict "root" $ "key" $key) }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "shipform.companionName" (dict "root" $ "key" $key) }}
+  labels:
+    {{- include "shipform.labelsWith" (dict "root" $ "extra" $job.labels "selector" $selector) | nindent 4 }}
+  {{- $annotations := deepCopy ($job.annotations | default dict) }}
+  {{- with $job.hook }}
+  {{- $_ := set $annotations "helm.sh/hook" . }}
+  {{- $_ := set $annotations "helm.sh/hook-weight" (toString (default "0" $job.hookWeight)) }}
+  {{- $_ := set $annotations "helm.sh/hook-delete-policy" (default "before-hook-creation,hook-succeeded" $job.hookDeletePolicy) }}
+  {{- end }}
+  {{- with $annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  backoffLimit: {{ ternary $job.backoffLimit 3 (hasKey $job "backoffLimit") }}
+  {{- with $job.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ . }}
+  {{- end }}
+  {{- $ttl := ternary $job.ttlSecondsAfterFinished 300 (hasKey $job "ttlSecondsAfterFinished") }}
+  {{- if not (kindIs "invalid" $ttl) }}
+  ttlSecondsAfterFinished: {{ $ttl }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- $selector | nindent 8 }}
+      {{- with $job.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "shipform.companionPodSpec" (dict "root" $ "job" $job) | nindent 6 }}
+{{- end }}
+{{- end }}

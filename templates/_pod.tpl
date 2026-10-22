@@ -27,6 +27,10 @@ true
 {{- end -}}
 {{- end -}}
 
+{{- /*
+Main container. Takes (dict "root" $ "container" <overrides> "mountPersistence"
+<bool> "companion" <bool>). A companion container drops probes and lifecycle.
+*/ -}}
 {{- define "shipform.container" -}}
 {{- $root := .root -}}
 {{- $container := .container | default dict -}}
@@ -57,6 +61,12 @@ true
 {{- $startupProbe := ternary $container.startupProbe $root.Values.startupProbe (hasKey $container "startupProbe") -}}
 {{- $securityContext := default $root.Values.securityContext $container.securityContext -}}
 {{- $lifecycle := default $root.Values.lifecycle $container.lifecycle -}}
+{{- if .companion -}}
+{{- $livenessProbe = dict -}}
+{{- $readinessProbe = dict -}}
+{{- $startupProbe = dict -}}
+{{- $lifecycle = dict -}}
+{{- end -}}
 - name: {{ default (include "shipform.name" $root) $container.name }}
   image: {{ include "shipform.image" (dict "image" $image) }}
   imagePullPolicy: {{ default "IfNotPresent" $image.pullPolicy }}
@@ -110,15 +120,21 @@ true
 {{- end }}
 {{- end -}}
 
+{{- /*
+Pod spec. Takes (dict "root" $ "container" <overrides> "restartPolicy" <policy>
+"mountPersistence" <bool> "companion" <bool> "serviceAccountName" <name>).
+A companion pod omits initContainers, extraContainers and the persistence volume.
+*/ -}}
 {{- define "shipform.podSpec" -}}
 {{- $root := .root -}}
+{{- $companion := .companion | default false -}}
 {{- $container := .container | default dict -}}
 {{- $restartPolicy := .restartPolicy | default "Always" -}}
 {{- with $root.Values.imagePullSecrets }}
 imagePullSecrets:
 {{ toYaml . | nindent 2 }}
 {{- end }}
-serviceAccountName: {{ include "shipform.serviceAccountName" $root }}
+serviceAccountName: {{ .serviceAccountName | default (include "shipform.serviceAccountName" $root) }}
 automountServiceAccountToken: {{ $root.Values.serviceAccount.automount }}
 enableServiceLinks: {{ $root.Values.enableServiceLinks }}
 {{- with $root.Values.podSecurityContext }}
@@ -132,14 +148,18 @@ priorityClassName: {{ . }}
 runtimeClassName: {{ . }}
 {{- end }}
 restartPolicy: {{ $restartPolicy }}
+{{- if not $companion }}
 {{- with $root.Values.initContainers }}
 initContainers:
 {{ toYaml . | nindent 2 }}
 {{- end }}
+{{- end }}
 containers:
-{{ include "shipform.container" (dict "root" $root "container" $container "mountPersistence" .mountPersistence) | nindent 2 }}
+{{ include "shipform.container" (dict "root" $root "container" $container "mountPersistence" (and .mountPersistence (not $companion)) "companion" $companion) | nindent 2 }}
+{{- if not $companion }}
 {{- with $root.Values.extraContainers }}
 {{ toYaml . | nindent 2 }}
+{{- end }}
 {{- end }}
 {{- $volumes := $root.Values.volumes | default list -}}
 {{- if include "shipform.needsTmpDir" $root -}}
@@ -149,7 +169,7 @@ containers:
 {{- end -}}
 {{- $volumes = append $volumes (dict "name" "tmp" "emptyDir" $emptyDir) -}}
 {{- end -}}
-{{- if $root.Values.persistence.enabled -}}
+{{- if and $root.Values.persistence.enabled (not $companion) -}}
 {{- $volumes = append $volumes (dict "name" "persistence" "persistentVolumeClaim" (dict "claimName" (include "shipform.persistenceClaimName" $root))) -}}
 {{- end -}}
 {{- with $volumes }}
@@ -216,4 +236,20 @@ Render the rules of a Gateway API route. Takes (dict "root" $ "rules" <list> "de
     - name: {{ include "shipform.fullname" $root }}
       port: {{ include "shipform.servicePortNumber" (dict "root" $root "port" (default $.default .servicePort)) }}
 {{- end }}
+{{- end -}}
+
+{{/*
+Pod spec of a companion Job or CronJob. Takes (dict "root" $ "job" <entry>).
+The container inherits the root image, env, envFrom, volumeMounts and
+securityContext; an entry's image and securityContext replace the root value.
+*/ -}}
+{{- define "shipform.companionPodSpec" -}}
+{{- $job := .job -}}
+{{- $container := dict "ports" (list) -}}
+{{- range $field := list "image" "command" "args" "env" "envFrom" "resources" "securityContext" -}}
+{{- with index $job $field -}}
+{{- $_ := set $container $field . -}}
+{{- end -}}
+{{- end -}}
+{{- include "shipform.podSpec" (dict "root" .root "container" $container "restartPolicy" (default "Never" $job.restartPolicy) "companion" true "serviceAccountName" (include "shipform.companionServiceAccountName" .)) -}}
 {{- end -}}

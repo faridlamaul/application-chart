@@ -1,0 +1,18 @@
+# The default web Deployment plus a database migration that runs as a Helm hook
+# before every install and upgrade. The hook starts before the chart's
+# ConfigMap, Secret and ServiceAccount exist, so it runs as the "default"
+# ServiceAccount and should read credentials from an existing Secret.
+jobs:
+  migrate:
+    enabled: true
+    hook: pre-install,pre-upgrade
+    image:
+      repository: busybox
+      tag: "1.36"
+    command: [sh, -c, echo migrated]
+    securityContext:
+      runAsUser: 65534
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: [ALL]
