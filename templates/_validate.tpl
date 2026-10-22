@@ -28,6 +28,23 @@ on each render. Renders nothing; calls `fail` on invalid combinations.
 {{- end -}}
 {{- end -}}
 {{- end -}}
+{{- $scalable := or (eq .Values.workload.type "Deployment") (eq .Values.workload.type "StatefulSet") -}}
+{{- if .Values.keda.enabled -}}
+{{- if .Values.autoscaling.enabled -}}
+{{- fail "keda.enabled and autoscaling.enabled cannot both be true" -}}
+{{- end -}}
+{{- if not $scalable -}}
+{{- fail (printf "keda.enabled is supported only for Deployment and StatefulSet, not %s" .Values.workload.type) -}}
+{{- end -}}
+{{- end -}}
+{{- if .Values.verticalPodAutoscaler.enabled -}}
+{{- if not $scalable -}}
+{{- fail (printf "verticalPodAutoscaler.enabled is supported only for Deployment and StatefulSet, not %s" .Values.workload.type) -}}
+{{- end -}}
+{{- if and (ne .Values.verticalPodAutoscaler.updateMode "Off") (or .Values.autoscaling.enabled .Values.keda.enabled) -}}
+{{- fail "verticalPodAutoscaler.updateMode must be Off when autoscaling or keda is enabled" -}}
+{{- end -}}
+{{- end -}}
 {{- range $kind, $max := dict "jobs" 63 "cronJobs" 52 -}}
 {{- range $key, $entry := (index $.Values $kind | default dict) -}}
 {{- if $entry.enabled -}}

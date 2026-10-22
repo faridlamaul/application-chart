@@ -198,6 +198,31 @@ autoscaling:
   metrics: []
   behavior: {}
 
+# KEDA ScaledObject. Requires the KEDA operator; excludes autoscaling.enabled.
+keda:
+  enabled: false
+  annotations: {}
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  idleReplicaCount: null
+  pollingInterval: 30
+  cooldownPeriod: 300
+  fallback: {}
+  advanced: {}
+  # Required (at least one) when enabled. Items are KEDA trigger objects.
+  triggers: []
+
+# VerticalPodAutoscaler. Requires the VPA CRDs. Use updateMode Off (recommend only)
+# alongside autoscaling or keda.
+verticalPodAutoscaler:
+  enabled: false
+  updateMode: "Off" # Off, Initial, Recreate, InPlaceOrRecreate, Auto
+  minReplicas: null
+  controlledResources: [cpu, memory]
+  controlledValues: RequestsAndLimits
+  minAllowed: {}
+  maxAllowed: {}
+
 podDisruptionBudget:
   enabled: false
   # Set one of the two; minAvailable defaults to 1 when both are null.

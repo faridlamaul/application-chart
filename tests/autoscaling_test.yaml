@@ -1,0 +1,241 @@
+suite: keda and vertical pod autoscaler
+templates:
+  - templates/scaledobject.yaml
+  - templates/vpa.yaml
+  - templates/deployment.yaml
+  - templates/statefulset.yaml
+  - templates/validate.yaml
+release:
+  name: app
+tests:
+  - it: renders nothing by default
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/scaledobject.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/vpa.yaml
+
+  - it: renders a ScaledObject targeting the Deployment
+    set:
+      keda.enabled: true
+      keda.triggers:
+        - type: cron
+          metadata: {timezone: UTC, start: "0 8 * * *", end: "0 18 * * *", desiredReplicas: "3"}
+    template: templates/scaledobject.yaml
+    asserts:
+      - isKind:
+          of: ScaledObject
+      - isAPIVersion:
+          of: keda.sh/v1alpha1
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: app-shipform
+      - equal:
+          path: spec.scaleTargetRef.kind
+          value: Deployment
+      - equal:
+          path: spec.maxReplicaCount
+          value: 10
+      - equal:
+          path: spec.triggers[0].type
+          value: cron
+      - notExists:
+          path: spec.idleReplicaCount
+
+  - it: targets the StatefulSet and renders optional fields
+    set:
+      workload.type: StatefulSet
+      keda.enabled: true
+      keda.idleReplicaCount: 0
+      keda.minReplicaCount: 0
+      keda.fallback: {failureThreshold: 3, replicas: 2}
+      keda.advanced: {restoreToOriginalReplicaCount: true}
+      keda.triggers: [{type: cpu, metricType: Utilization, metadata: {value: "60"}}]
+    template: templates/scaledobject.yaml
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.kind
+          value: StatefulSet
+      - equal:
+          path: spec.idleReplicaCount
+          value: 0
+      - equal:
+          path: spec.minReplicaCount
+          value: 0
+      - equal:
+          path: spec.fallback.replicas
+          value: 2
+      - equal:
+          path: spec.advanced.restoreToOriginalReplicaCount
+          value: true
+
+  - it: omits replicas when KEDA scales a Deployment
+    set:
+      keda.enabled: true
+      keda.triggers: [{type: cpu, metadata: {value: "60"}}]
+    template: templates/deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: omits replicas when KEDA scales a StatefulSet
+    set:
+      workload.type: StatefulSet
+      keda.enabled: true
+      keda.triggers: [{type: cpu, metadata: {value: "60"}}]
+    template: templates/statefulset.yaml
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: keeps replicas on a StatefulSet by default
+    set:
+      workload.type: StatefulSet
+    template: templates/statefulset.yaml
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+
+  - it: fails with KEDA and HPA
+    set:
+      keda.enabled: true
+      keda.triggers: [{type: cpu, metadata: {value: "60"}}]
+      autoscaling.enabled: true
+    template: templates/validate.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: keda.enabled and autoscaling.enabled cannot both be true
+
+  - it: fails with KEDA on a CronJob
+    set:
+      workload.type: CronJob
+      keda.enabled: true
+      keda.triggers: [{type: cpu, metadata: {value: "60"}}]
+    template: templates/validate.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: keda.enabled is supported only for Deployment and StatefulSet
+
+  - it: requires a trigger
+    set:
+      keda.enabled: true
+      keda.triggers: []
+    template: templates/scaledobject.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: triggers
+
+  - it: allows empty triggers while KEDA is disabled
+    set:
+      keda.triggers: []
+    template: templates/scaledobject.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a recommend-only VPA
+    set:
+      verticalPodAutoscaler.enabled: true
+    template: templates/vpa.yaml
+    asserts:
+      - isKind:
+          of: VerticalPodAutoscaler
+      - isAPIVersion:
+          of: autoscaling.k8s.io/v1
+      - equal:
+          path: spec.updatePolicy.updateMode
+          value: "Off"
+      - equal:
+          path: spec.targetRef.kind
+          value: Deployment
+      - equal:
+          path: spec.targetRef.name
+          value: app-shipform
+      - notExists:
+          path: spec.updatePolicy.minReplicas
+      - equal:
+          path: spec.resourcePolicy.containerPolicies[0].containerName
+          value: "*"
+      - equal:
+          path: spec.resourcePolicy.containerPolicies[0].controlledValues
+          value: RequestsAndLimits
+      - equal:
+          path: spec.resourcePolicy.containerPolicies[0].controlledResources
+          value: [cpu, memory]
+
+  - it: renders VPA bounds, minReplicas, and StatefulSet target
+    set:
+      workload.type: StatefulSet
+      verticalPodAutoscaler.enabled: true
+      verticalPodAutoscaler.updateMode: Auto
+      verticalPodAutoscaler.minReplicas: 2
+      verticalPodAutoscaler.minAllowed: {cpu: 50m}
+      verticalPodAutoscaler.maxAllowed: {memory: 1Gi}
+    template: templates/vpa.yaml
+    asserts:
+      - equal:
+          path: spec.targetRef.kind
+          value: StatefulSet
+      - equal:
+          path: spec.updatePolicy.updateMode
+          value: Auto
+      - equal:
+          path: spec.updatePolicy.minReplicas
+          value: 2
+      - equal:
+          path: spec.resourcePolicy.containerPolicies[0].minAllowed.cpu
+          value: 50m
+      - equal:
+          path: spec.resourcePolicy.containerPolicies[0].maxAllowed.memory
+          value: 1Gi
+
+  - it: fails with a VPA on a Job
+    set:
+      workload.type: Job
+      verticalPodAutoscaler.enabled: true
+    template: templates/validate.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: verticalPodAutoscaler.enabled is supported only for Deployment and StatefulSet
+
+  - it: fails with an active VPA and HPA
+    set:
+      verticalPodAutoscaler.enabled: true
+      verticalPodAutoscaler.updateMode: Auto
+      autoscaling.enabled: true
+    template: templates/validate.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: verticalPodAutoscaler.updateMode must be Off
+
+  - it: fails with an active VPA and KEDA
+    set:
+      verticalPodAutoscaler.enabled: true
+      verticalPodAutoscaler.updateMode: Initial
+      keda.enabled: true
+      keda.triggers: [{type: cpu, metadata: {value: "60"}}]
+    template: templates/validate.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: verticalPodAutoscaler.updateMode must be Off
+
+  - it: allows a recommend-only VPA with HPA
+    set:
+      verticalPodAutoscaler.enabled: true
+      autoscaling.enabled: true
+    template: templates/vpa.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: rejects an unknown VPA update mode
+    set:
+      verticalPodAutoscaler.enabled: true
+      verticalPodAutoscaler.updateMode: Sometimes
+    template: templates/vpa.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: updateMode

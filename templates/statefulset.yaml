@@ -11,7 +11,9 @@ metadata:
   {{- end }}
 spec:
   serviceName: {{ include "shipform.statefulSetServiceName" . }}
+  {{- if not .Values.keda.enabled }}
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
   podManagementPolicy: {{ .Values.statefulSet.podManagementPolicy }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   updateStrategy:
