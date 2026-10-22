@@ -2,6 +2,49 @@
   "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": false,
+  "definitions": {
+    "securityContext": {
+      "type": "object",
+      "properties": {
+        "privileged": {
+          "const": false,
+          "description": "Privileged containers are not allowed."
+        },
+        "capabilities": {
+          "type": "object",
+          "properties": {
+            "add": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "NET_BIND_SERVICE"
+                ]
+              },
+              "description": "Only NET_BIND_SERVICE may be added."
+            }
+          }
+        }
+      }
+    },
+    "volume": {
+      "type": "object",
+      "not": {
+        "required": [
+          "hostPath"
+        ]
+      },
+      "description": "hostPath volumes are not allowed."
+    },
+    "container": {
+      "type": "object",
+      "properties": {
+        "securityContext": {
+          "$ref": "#/definitions/securityContext"
+        }
+      }
+    }
+  },
   "properties": {
     "global": {
       "type": "object",
@@ -203,7 +246,30 @@
       "type": "object"
     },
     "securityContext": {
-      "type": "object"
+      "$ref": "#/definitions/securityContext"
+    },
+    "tmpDir": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "sizeLimit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "medium": {
+          "type": "string",
+          "enum": [
+            "",
+            "Memory"
+          ]
+        }
+      }
+    },
+    "enableServiceLinks": {
+      "type": "boolean"
     },
     "serviceAccount": {
       "type": "object",
@@ -645,6 +711,18 @@
             ]
           }
         },
+        "allowDNS": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "to": {
+              "type": "array"
+            }
+          }
+        },
         "ingress": {
           "type": "array"
         },
@@ -828,16 +906,25 @@
       "type": "array"
     },
     "volumes": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/volume"
+      }
     },
     "volumeMounts": {
       "type": "array"
     },
     "initContainers": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/container"
+      }
     },
     "extraContainers": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/container"
+      }
     },
     "job": {
       "type": "object",

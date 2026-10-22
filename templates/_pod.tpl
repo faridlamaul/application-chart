@@ -10,6 +10,23 @@
 {{- end -}}
 {{- end -}}
 
+{{- /*
+Returns "true" when the chart should add its /tmp emptyDir: tmpDir is enabled
+and no root volumeMounts entry already mounts /tmp. Takes the root context.
+*/ -}}
+{{- define "shipform.needsTmpDir" -}}
+{{- $root := . -}}
+{{- $mounted := false -}}
+{{- range ($root.Values.volumeMounts | default list) -}}
+{{- if eq (toString .mountPath) "/tmp" -}}
+{{- $mounted = true -}}
+{{- end -}}
+{{- end -}}
+{{- if and $root.Values.tmpDir.enabled (not $mounted) -}}
+true
+{{- end -}}
+{{- end -}}
+
 {{- define "shipform.container" -}}
 {{- $root := .root -}}
 {{- $container := .container | default dict -}}
@@ -22,6 +39,9 @@
 {{- $envFrom := concat ($root.Values.envFrom | default list) ($container.envFrom | default list) -}}
 {{- $resources := default $root.Values.resources $container.resources -}}
 {{- $volumeMounts := concat ($root.Values.volumeMounts | default list) ($container.volumeMounts | default list) -}}
+{{- if include "shipform.needsTmpDir" $root -}}
+{{- $volumeMounts = append $volumeMounts (dict "name" "tmp" "mountPath" "/tmp") -}}
+{{- end -}}
 {{- $command := default $root.Values.command $container.command -}}
 {{- $args := default $root.Values.args $container.args -}}
 {{- /* A key present in the container overrides the root value, even when empty. */ -}}
@@ -93,6 +113,7 @@ imagePullSecrets:
 {{- end }}
 serviceAccountName: {{ include "shipform.serviceAccountName" $root }}
 automountServiceAccountToken: {{ $root.Values.serviceAccount.automount }}
+enableServiceLinks: {{ $root.Values.enableServiceLinks }}
 {{- with $root.Values.podSecurityContext }}
 securityContext:
 {{ toYaml . | nindent 2 }}
@@ -113,7 +134,15 @@ containers:
 {{- with $root.Values.extraContainers }}
 {{ toYaml . | nindent 2 }}
 {{- end }}
-{{- with $root.Values.volumes }}
+{{- $volumes := $root.Values.volumes | default list -}}
+{{- if include "shipform.needsTmpDir" $root -}}
+{{- $emptyDir := dict "sizeLimit" $root.Values.tmpDir.sizeLimit -}}
+{{- with $root.Values.tmpDir.medium -}}
+{{- $_ := set $emptyDir "medium" . -}}
+{{- end -}}
+{{- $volumes = append $volumes (dict "name" "tmp" "emptyDir" $emptyDir) -}}
+{{- end -}}
+{{- with $volumes }}
 volumes:
 {{ toYaml . | nindent 2 }}
 {{- end }}

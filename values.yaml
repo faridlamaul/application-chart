@@ -63,10 +63,22 @@ podSecurityContext:
 
 securityContext:
   allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: false
+  readOnlyRootFilesystem: true
   capabilities:
     drop:
       - ALL
+
+# An emptyDir mounted at /tmp so applications can write temporary files under
+# the read-only root filesystem. Skipped when volumeMounts already mounts /tmp.
+# Set medium to Memory for a tmpfs; its usage counts against the memory limit.
+tmpDir:
+  enabled: true
+  sizeLimit: 64Mi
+  medium: ""
+
+# Kubernetes injects one set of environment variables per Service in the
+# namespace when this is true. Use DNS names instead.
+enableServiceLinks: false
 
 serviceAccount:
   create: true
@@ -157,6 +169,17 @@ networkPolicy:
   labels: {}
   policyTypes:
     - Ingress
+  # Prepends an egress rule allowing port 53 (UDP and TCP) to the peers in
+  # `to`. Rendered only when policyTypes contains Egress.
+  allowDNS:
+    enabled: true
+    to:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: kube-system
+        podSelector:
+          matchLabels:
+            k8s-app: kube-dns
   ingress: []
   egress: []
 
