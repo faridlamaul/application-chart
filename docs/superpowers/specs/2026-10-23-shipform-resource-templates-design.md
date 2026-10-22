@@ -171,7 +171,7 @@ verticalPodAutoscaler:
   maxAllowed: {}
 ```
 
-- Workload types: Deployment and StatefulSet.
+- Workload types: Deployment and StatefulSet; render fails for the others.
 - Render fails when `updateMode` is not `Off` and `autoscaling.enabled` or `keda.enabled` is true.
 
 ### Prometheus rules and pod monitors
@@ -237,6 +237,7 @@ All in `shipform.validate`, each with a message that names the values to change.
 | Persistence on StatefulSet | `persistence is not supported for workload.type StatefulSet` |
 | KEDA with HPA | `keda.enabled and autoscaling.enabled cannot both be true` |
 | KEDA on Job or CronJob | `keda.enabled is supported only for Deployment and StatefulSet` |
+| VPA on Job or CronJob | `verticalPodAutoscaler.enabled is supported only for Deployment and StatefulSet` |
 | VPA active with HPA or KEDA | `verticalPodAutoscaler.updateMode must be Off when autoscaling or keda is enabled` |
 | PodMonitor with ServiceMonitor | `podMonitor.enabled and serviceMonitor.enabled cannot both be true` |
 
