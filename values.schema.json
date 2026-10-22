@@ -56,7 +56,7 @@
         },
         "hook": {
           "type": "string",
-          "description": "Comma-separated Helm hooks. Empty: a plain Job."
+          "description": "Comma-separated Helm hooks. Empty: post-install,post-upgrade."
         },
         "hookWeight": {
           "type": [

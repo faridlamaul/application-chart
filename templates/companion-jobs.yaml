@@ -9,15 +9,12 @@ metadata:
   labels:
     {{- include "shipform.labelsWith" (dict "root" $ "extra" $job.labels "selector" $selector) | nindent 4 }}
   {{- $annotations := deepCopy ($job.annotations | default dict) }}
-  {{- with $job.hook }}
-  {{- $_ := set $annotations "helm.sh/hook" . }}
+  {{- /* A Job's pod template is immutable, so every companion Job is a hook. */}}
+  {{- $_ := set $annotations "helm.sh/hook" (default "post-install,post-upgrade" $job.hook) }}
   {{- $_ := set $annotations "helm.sh/hook-weight" (toString (default "0" $job.hookWeight)) }}
   {{- $_ := set $annotations "helm.sh/hook-delete-policy" (default "before-hook-creation,hook-succeeded" $job.hookDeletePolicy) }}
-  {{- end }}
-  {{- with $annotations }}
   annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- toYaml $annotations | nindent 4 }}
 spec:
   backoffLimit: {{ ternary $job.backoffLimit 3 (hasKey $job "backoffLimit") }}
   {{- with $job.activeDeadlineSeconds }}

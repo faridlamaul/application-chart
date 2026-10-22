@@ -29,7 +29,8 @@ true
 
 {{- /*
 Main container. Takes (dict "root" $ "container" <overrides> "mountPersistence"
-<bool> "companion" <bool>). A companion container drops probes and lifecycle.
+<bool> "companion" <bool>). A companion container drops probes and lifecycle, and takes command, args and
+resources only from its own overrides.
 */ -}}
 {{- define "shipform.container" -}}
 {{- $root := .root -}}
@@ -66,6 +67,9 @@ Main container. Takes (dict "root" $ "container" <overrides> "mountPersistence"
 {{- $readinessProbe = dict -}}
 {{- $startupProbe = dict -}}
 {{- $lifecycle = dict -}}
+{{- $command = $container.command -}}
+{{- $args = $container.args -}}
+{{- $resources = $container.resources -}}
 {{- end -}}
 - name: {{ default (include "shipform.name" $root) $container.name }}
   image: {{ include "shipform.image" (dict "image" $image) }}
@@ -123,7 +127,9 @@ Main container. Takes (dict "root" $ "container" <overrides> "mountPersistence"
 {{- /*
 Pod spec. Takes (dict "root" $ "container" <overrides> "restartPolicy" <policy>
 "mountPersistence" <bool> "companion" <bool> "serviceAccountName" <name>).
-A companion pod omits initContainers, extraContainers and the persistence volume.
+A companion pod omits initContainers, extraContainers, the persistence volume,
+priorityClassName, runtimeClassName, topologySpreadConstraints and
+terminationGracePeriodSeconds.
 */ -}}
 {{- define "shipform.podSpec" -}}
 {{- $root := .root -}}
@@ -141,11 +147,13 @@ enableServiceLinks: {{ $root.Values.enableServiceLinks }}
 securityContext:
 {{ toYaml . | nindent 2 }}
 {{- end }}
+{{- if not $companion }}
 {{- with $root.Values.priorityClassName }}
 priorityClassName: {{ . }}
 {{- end }}
 {{- with $root.Values.runtimeClassName }}
 runtimeClassName: {{ . }}
+{{- end }}
 {{- end }}
 restartPolicy: {{ $restartPolicy }}
 {{- if not $companion }}
@@ -188,12 +196,14 @@ affinity:
 tolerations:
 {{ toYaml . | nindent 2 }}
 {{- end }}
+{{- if not $companion }}
 {{- with $root.Values.topologySpreadConstraints }}
 topologySpreadConstraints:
 {{ toYaml . | nindent 2 }}
 {{- end }}
 {{- if not (kindIs "invalid" $root.Values.terminationGracePeriodSeconds) }}
 terminationGracePeriodSeconds: {{ $root.Values.terminationGracePeriodSeconds }}
+{{- end }}
 {{- end }}
 {{- end -}}
 
@@ -242,6 +252,7 @@ Render the rules of a Gateway API route. Takes (dict "root" $ "rules" <list> "de
 Pod spec of a companion Job or CronJob. Takes (dict "root" $ "job" <entry>).
 The container inherits the root image, env, envFrom, volumeMounts and
 securityContext; an entry's image and securityContext replace the root value.
+command, args and resources come only from the entry.
 */ -}}
 {{- define "shipform.companionPodSpec" -}}
 {{- $job := .job -}}

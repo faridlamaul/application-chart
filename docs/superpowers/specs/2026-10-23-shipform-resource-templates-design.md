@@ -76,7 +76,7 @@ grpcRoute:
 jobs: {}
 #  migrate:
 #    enabled: true
-#    hook: pre-install,pre-upgrade   # empty: a plain Job
+#    hook: pre-install,pre-upgrade   # empty: post-install,post-upgrade
 #    hookWeight: "0"
 #    hookDeletePolicy: before-hook-creation,hook-succeeded
 #    serviceAccountName: ""          # see rules below
@@ -110,9 +110,10 @@ cronJobs: {}
 
 - Name: `<fullname>-<key>`. Render fails when the name exceeds 63 characters for a Job or 52 for a CronJob, instead of truncating and risking a collision.
 - Pod labels: `app.kubernetes.io/name: <name>-<key>`, `app.kubernetes.io/instance: <release>`, `app.kubernetes.io/component: <key>`. The main Service, PodDisruptionBudget, and NetworkPolicy do not select companion pods.
-- Inherited from the root values: image, `imagePullSecrets`, `env`, `envFrom`, `volumes`, `volumeMounts`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`, `tmpDir`. Not inherited: probes, `initContainers`, `extraContainers` (a sidecar would keep the Job from completing), `persistence`.
+- Inherited from the root values: image, `imagePullSecrets`, `env`, `envFrom`, `volumes`, `volumeMounts`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`, `tmpDir`. Not inherited: `command`, `args`, `resources` (each comes only from the entry), probes, `initContainers`, `extraContainers` (a sidecar would keep the Job from completing), `persistence`, `priorityClassName`, `runtimeClassName`, `topologySpreadConstraints`, `terminationGracePeriodSeconds`.
 - ServiceAccount: an explicit `serviceAccountName` wins. A hook that includes `pre-install` defaults to `default` when `serviceAccount.create` is true, because the chart's ServiceAccount does not exist yet. Every other companion uses `shipform.serviceAccountName`. `automountServiceAccountToken` follows `serviceAccount.automount`.
-- Hooks run before chart-created ConfigMaps, Secrets, and ExternalSecrets exist on first install. The README says so and points to existing Secrets.
+- Every companion Job is a Helm hook, because a Job's pod template is immutable. An empty `hook` means `post-install,post-upgrade`.
+- Pre-install hooks run before chart-created ConfigMaps, Secrets, and ExternalSecrets exist on first install. The README says so and points to existing Secrets.
 
 ### Persistence
 
