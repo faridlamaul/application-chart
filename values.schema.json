@@ -1410,6 +1410,40 @@
         }
       }
     },
+    "prometheusRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "namespace": {"type": "string"},
+        "labels": {"type": "object", "additionalProperties": {"type": "string"}},
+        "annotations": {"type": "object", "additionalProperties": {"type": "string"}},
+        "groups": {"type": "array", "items": {"type": "object"}}
+      },
+      "if": {"properties": {"enabled": {"const": true}}, "required": ["enabled"]},
+      "then": {"properties": {"groups": {"minItems": 1}}}
+    },
+    "podMonitor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "namespace": {"type": "string"},
+        "labels": {"type": "object", "additionalProperties": {"type": "string"}},
+        "annotations": {"type": "object", "additionalProperties": {"type": "string"}},
+        "interval": {"type": "string"},
+        "scrapeTimeout": {"type": "string"},
+        "path": {"type": "string"},
+        "port": {"type": "string", "minLength": 1},
+        "scheme": {"type": "string", "enum": ["http", "https"]},
+        "relabelings": {"type": "array"},
+        "metricRelabelings": {"type": "array"}
+      }
+    },
+    "extraObjects": {
+      "type": "array",
+      "items": {"type": ["object", "string"]}
+    },
     "deploymentStrategy": {
       "type": "object",
       "additionalProperties": false,

@@ -261,6 +261,30 @@ serviceMonitor:
   relabelings: []
   metricRelabelings: []
 
+prometheusRule:
+  enabled: false
+  namespace: ""
+  labels: {}
+  annotations: {}
+  groups: []                        # required (at least one group) when enabled
+
+podMonitor:
+  enabled: false                    # cannot be combined with serviceMonitor.enabled
+  namespace: ""
+  labels: {}
+  annotations: {}
+  interval: 30s
+  scrapeTimeout: 10s
+  path: /metrics
+  port: http                        # container port name
+  scheme: http
+  relabelings: []
+  metricRelabelings: []
+
+# Extra manifests: each item is a map or a string. Maps render through
+# tpl (toYaml .); strings through tpl. The chart adds no labels.
+extraObjects: []
+
 deploymentStrategy:
   type: RollingUpdate
   rollingUpdate:

@@ -55,4 +55,7 @@ on each render. Renders nothing; calls `fail` on invalid combinations.
 {{- end -}}
 {{- end -}}
 {{- end -}}
+{{- if and .Values.podMonitor.enabled .Values.serviceMonitor.enabled -}}
+{{- fail "podMonitor.enabled and serviceMonitor.enabled cannot both be true; each pod would be scraped twice" -}}
+{{- end -}}
 {{- end -}}

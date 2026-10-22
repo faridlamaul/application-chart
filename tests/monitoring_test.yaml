@@ -1,0 +1,114 @@
+suite: prometheus rule, pod monitor and extra objects
+templates:
+  - templates/prometheusrule.yaml
+  - templates/podmonitor.yaml
+  - templates/extra-objects.yaml
+  - templates/validate.yaml
+release:
+  name: app
+tests:
+  - it: renders nothing by default
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/prometheusrule.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/podmonitor.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/extra-objects.yaml
+
+  - it: renders a PrometheusRule with the given groups
+    set:
+      prometheusRule.enabled: true
+      prometheusRule.groups:
+        - name: app.rules
+          rules:
+            - alert: AppDown
+              expr: up == 0
+              for: 5m
+    template: templates/prometheusrule.yaml
+    asserts:
+      - isKind:
+          of: PrometheusRule
+      - equal:
+          path: spec.groups[0].name
+          value: app.rules
+      - equal:
+          path: spec.groups[0].rules[0].alert
+          value: AppDown
+
+  - it: rejects an enabled PrometheusRule without groups
+    set:
+      prometheusRule.enabled: true
+    template: templates/prometheusrule.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: prometheusRule.groups
+
+  - it: renders a PodMonitor selecting the main pods
+    set:
+      podMonitor.enabled: true
+    template: templates/podmonitor.yaml
+    asserts:
+      - isKind:
+          of: PodMonitor
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app.kubernetes.io/name: shipform
+            app.kubernetes.io/instance: app
+      - equal:
+          path: spec.podMetricsEndpoints[0].port
+          value: http
+
+  - it: fails with PodMonitor and ServiceMonitor
+    set:
+      podMonitor.enabled: true
+      serviceMonitor.enabled: true
+    template: templates/validate.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: podMonitor.enabled and serviceMonitor.enabled cannot both be true
+
+  - it: rejects unknown podMonitor keys
+    set:
+      podMonitor.typ: x
+    template: templates/podmonitor.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: typ
+
+  - it: renders extraObjects maps through tpl
+    set:
+      extraObjects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: "{{ .Release.Name }}-extra"
+    template: templates/extra-objects.yaml
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: app-extra
+
+  - it: renders extraObjects strings
+    set:
+      extraObjects:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: {{ .Release.Name }}-str
+          data:
+            a: b
+    template: templates/extra-objects.yaml
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: app-str
