@@ -88,7 +88,7 @@ jobs:
           helm install db . --set workload.type=StatefulSet --set replicaCount=1 --wait --timeout 3m
           # busybox nslookup ignores the search domains, so use the full name.
           kubectl run dns-check --image=busybox:1.36 --restart=Never --rm -i --quiet -- \
-            nslookup db-application-chart-0.db-application-chart-headless.default.svc.cluster.local
+            nslookup db-shipform-0.db-shipform-headless.default.svc.cluster.local
 
       - name: Redis StatefulSet example runs as non-root with storage
         run: |
@@ -103,9 +103,9 @@ jobs:
             --set podSecurityContext.runAsUser=65534 --set 'job.command={sh,-c,echo done}'
             --set service.enabled=false --wait --timeout 3m)
           helm install batch . "${job_args[@]}"
-          kubectl wait --for=condition=complete job/batch-application-chart --timeout=60s
+          kubectl wait --for=condition=complete job/batch-shipform --timeout=60s
           helm upgrade batch . "${job_args[@]}" --set 'job.env[0].name=RUN' --set-string 'job.env[0].value=2'
-          kubectl get job batch-application-chart -o jsonpath='{.spec.template.spec.containers[0].env[0].value}' | grep -x 2
+          kubectl get job batch-shipform -o jsonpath='{.spec.template.spec.containers[0].env[0].value}' | grep -x 2
 
       - name: Diagnostics on failure
         if: failure()

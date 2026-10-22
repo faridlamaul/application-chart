@@ -1,14 +1,14 @@
 {{/*
 Expand the chart name.
 */}}
-{{- define "application-chart.name" -}}
+{{- define "shipform.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*
 Create a fully qualified app name.
 */}}
-{{- define "application-chart.fullname" -}}
+{{- define "shipform.fullname" -}}
 {{- if .Values.fullnameOverride -}}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
@@ -24,15 +24,15 @@ Create a fully qualified app name.
 {{/*
 Create chart name and version label value.
 */}}
-{{- define "application-chart.chart" -}}
+{{- define "shipform.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*
 Common labels.
 */}}
-{{- define "application-chart.labels" -}}
-{{- include "application-chart.labelsWith" (dict "root" . "extra" dict) -}}
+{{- define "shipform.labels" -}}
+{{- include "shipform.labelsWith" (dict "root" . "extra" dict) -}}
 {{- end -}}
 
 {{/*
@@ -40,17 +40,17 @@ Common labels plus a resource's own labels. Precedence: selector labels (never
 replaced), then the resource's labels, then .Values.labels, then the standard
 labels, so overrides replace keys instead of duplicating them.
 */}}
-{{- define "application-chart.labelsWith" -}}
+{{- define "shipform.labelsWith" -}}
 {{- $root := .root -}}
 {{- $standard := dict
-  "helm.sh/chart" (include "application-chart.chart" $root)
+  "helm.sh/chart" (include "shipform.chart" $root)
   "app.kubernetes.io/component" (default "application" $root.Values.component)
-  "app.kubernetes.io/part-of" (default (include "application-chart.name" $root) $root.Values.partOf)
+  "app.kubernetes.io/part-of" (default (include "shipform.name" $root) $root.Values.partOf)
   "app.kubernetes.io/managed-by" $root.Release.Service -}}
 {{- with $root.Chart.AppVersion }}
 {{- $_ := set $standard "app.kubernetes.io/version" . }}
 {{- end }}
-{{- $selector := include "application-chart.selectorLabels" $root | fromYaml -}}
+{{- $selector := include "shipform.selectorLabels" $root | fromYaml -}}
 {{- $labels := merge $selector (deepCopy (.extra | default dict)) (deepCopy ($root.Values.labels | default dict)) $standard -}}
 {{- toYaml $labels -}}
 {{- end -}}
@@ -58,17 +58,17 @@ labels, so overrides replace keys instead of duplicating them.
 {{/*
 Selector labels must remain stable across upgrades.
 */}}
-{{- define "application-chart.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "application-chart.name" . }}
+{{- define "shipform.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "shipform.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/*
 ServiceAccount name.
 */}}
-{{- define "application-chart.serviceAccountName" -}}
+{{- define "shipform.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create -}}
-{{- default (include "application-chart.fullname" .) .Values.serviceAccount.name -}}
+{{- default (include "shipform.fullname" .) .Values.serviceAccount.name -}}
 {{- else -}}
 {{- default "default" .Values.serviceAccount.name -}}
 {{- end -}}
@@ -78,41 +78,41 @@ ServiceAccount name.
 Governing Service of a StatefulSet. It must be headless for stable per-pod DNS:
 the main Service when it is headless, otherwise the chart's -headless Service.
 */}}
-{{- define "application-chart.statefulSetServiceName" -}}
+{{- define "shipform.statefulSetServiceName" -}}
 {{- if .Values.statefulSet.serviceName -}}
 {{- .Values.statefulSet.serviceName -}}
 {{- else if and .Values.service.enabled .Values.service.headless -}}
-{{- include "application-chart.fullname" . -}}
+{{- include "shipform.fullname" . -}}
 {{- else -}}
-{{- printf "%s-headless" (include "application-chart.fullname" . | trunc 54 | trimSuffix "-") -}}
+{{- printf "%s-headless" (include "shipform.fullname" . | trunc 54 | trimSuffix "-") -}}
 {{- end -}}
 {{- end -}}
 
-{{- define "application-chart.configMapName" -}}
-{{- default (printf "%s-config" (include "application-chart.fullname" .)) .Values.configMap.name -}}
+{{- define "shipform.configMapName" -}}
+{{- default (printf "%s-config" (include "shipform.fullname" .)) .Values.configMap.name -}}
 {{- end -}}
 
-{{- define "application-chart.secretName" -}}
-{{- default (printf "%s-secret" (include "application-chart.fullname" .)) .Values.secret.name -}}
+{{- define "shipform.secretName" -}}
+{{- default (printf "%s-secret" (include "shipform.fullname" .)) .Values.secret.name -}}
 {{- end -}}
 
-{{- define "application-chart.externalSecretTargetName" -}}
-{{- default (include "application-chart.secretName" .) .Values.externalSecret.target.name -}}
+{{- define "shipform.externalSecretTargetName" -}}
+{{- default (include "shipform.secretName" .) .Values.externalSecret.target.name -}}
 {{- end -}}
 
-{{- define "application-chart.image" -}}
+{{- define "shipform.image" -}}
 {{- $image := .image -}}
 {{- printf "%s:%s" $image.repository $image.tag | quote -}}
 {{- end -}}
 
-{{- define "application-chart.probe" -}}
+{{- define "shipform.probe" -}}
 {{- $probe := . -}}
 {{- if $probe.enabled }}
 {{- omit $probe "enabled" | toYaml -}}
 {{- end -}}
 {{- end -}}
 
-{{- define "application-chart.container" -}}
+{{- define "shipform.container" -}}
 {{- $root := .root -}}
 {{- $container := .container | default dict -}}
 {{- $image := default $root.Values.image $container.image -}}
@@ -132,8 +132,8 @@ the main Service when it is headless, otherwise the chart's -headless Service.
 {{- $startupProbe := ternary $container.startupProbe $root.Values.startupProbe (hasKey $container "startupProbe") -}}
 {{- $securityContext := default $root.Values.securityContext $container.securityContext -}}
 {{- $lifecycle := default $root.Values.lifecycle $container.lifecycle -}}
-- name: {{ default (include "application-chart.name" $root) $container.name }}
-  image: {{ include "application-chart.image" (dict "image" $image) }}
+- name: {{ default (include "shipform.name" $root) $container.name }}
+  image: {{ include "shipform.image" (dict "image" $image) }}
   imagePullPolicy: {{ default "IfNotPresent" $image.pullPolicy }}
 {{- with $command }}
   command:
@@ -157,15 +157,15 @@ the main Service when it is headless, otherwise the chart's -headless Service.
 {{- end }}
 {{- if and $livenessProbe $livenessProbe.enabled }}
   livenessProbe:
-{{ include "application-chart.probe" $livenessProbe | nindent 4 }}
+{{ include "shipform.probe" $livenessProbe | nindent 4 }}
 {{- end }}
 {{- if and $readinessProbe $readinessProbe.enabled }}
   readinessProbe:
-{{ include "application-chart.probe" $readinessProbe | nindent 4 }}
+{{ include "shipform.probe" $readinessProbe | nindent 4 }}
 {{- end }}
 {{- if and $startupProbe $startupProbe.enabled }}
   startupProbe:
-{{ include "application-chart.probe" $startupProbe | nindent 4 }}
+{{ include "shipform.probe" $startupProbe | nindent 4 }}
 {{- end }}
 {{- with $resources }}
   resources:
@@ -185,7 +185,7 @@ the main Service when it is headless, otherwise the chart's -headless Service.
 {{- end }}
 {{- end -}}
 
-{{- define "application-chart.podSpec" -}}
+{{- define "shipform.podSpec" -}}
 {{- $root := .root -}}
 {{- $container := .container | default dict -}}
 {{- $restartPolicy := .restartPolicy | default "Always" -}}
@@ -193,7 +193,7 @@ the main Service when it is headless, otherwise the chart's -headless Service.
 imagePullSecrets:
 {{ toYaml . | nindent 2 }}
 {{- end }}
-serviceAccountName: {{ include "application-chart.serviceAccountName" $root }}
+serviceAccountName: {{ include "shipform.serviceAccountName" $root }}
 automountServiceAccountToken: {{ $root.Values.serviceAccount.automount }}
 {{- with $root.Values.podSecurityContext }}
 securityContext:
@@ -211,7 +211,7 @@ initContainers:
 {{ toYaml . | nindent 2 }}
 {{- end }}
 containers:
-{{ include "application-chart.container" (dict "root" $root "container" $container) | nindent 2 }}
+{{ include "shipform.container" (dict "root" $root "container" $container) | nindent 2 }}
 {{- with $root.Values.extraContainers }}
 {{ toYaml . | nindent 2 }}
 {{- end }}

@@ -1,7 +1,7 @@
 name: Publish
 
 # Every push to main runs CI. When Chart.yaml carries a version that has no
-# application-chart-<version> tag yet, the chart is pushed to GHCR (OCI), added
+# shipform-<version> tag yet, the chart is pushed to GHCR (OCI), added
 # to the GitHub Pages repository, and tagged with a GitHub Release. The tag is
 # created last, so a failed run can simply be re-run.
 on:
@@ -39,7 +39,7 @@ jobs:
         name: Check whether this version is already published
         run: |
           version="$(helm show chart . | sed -n 's/^version: //p')"
-          tag="application-chart-${version}"
+          tag="shipform-${version}"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null; then
@@ -60,7 +60,7 @@ jobs:
           VERSION: ${{ steps.chart.outputs.version }}
         run: |
           echo "$GITHUB_TOKEN" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
-          helm push "dist/application-chart-${VERSION}.tgz" oci://ghcr.io/faridlamaul/charts
+          helm push "dist/shipform-${VERSION}.tgz" oci://ghcr.io/faridlamaul/charts
 
       - name: Add to the GitHub Pages repository
         if: steps.chart.outputs.new == 'true'
@@ -71,10 +71,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin gh-pages
           git worktree add pages origin/gh-pages
-          cp "dist/application-chart-${VERSION}.tgz" pages/
-          helm repo index pages --url https://faridlamaul.github.io/application-chart --merge pages/index.yaml
-          git -C pages add "application-chart-${VERSION}.tgz" index.yaml
-          git -C pages commit -m "Publish application-chart ${VERSION}"
+          cp "dist/shipform-${VERSION}.tgz" pages/
+          helm repo index pages --url https://faridlamaul.github.io/shipform --merge pages/index.yaml
+          git -C pages add "shipform-${VERSION}.tgz" index.yaml
+          git -C pages commit -m "Publish shipform ${VERSION}"
           git -C pages push origin HEAD:gh-pages
 
       - name: Tag and create the GitHub Release
@@ -84,6 +84,6 @@ jobs:
           TAG: ${{ steps.chart.outputs.tag }}
           VERSION: ${{ steps.chart.outputs.version }}
         run: |
-          gh release create "$TAG" "dist/application-chart-${VERSION}.tgz" \
+          gh release create "$TAG" "dist/shipform-${VERSION}.tgz" \
             --target "$GITHUB_SHA" --title "$TAG" \
-            --notes "Changes: [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}/CHANGELOG.md). Install with \`helm install <release> oci://ghcr.io/faridlamaul/charts/application-chart --version ${VERSION}\`."
+            --notes "Changes: [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}/CHANGELOG.md). Install with \`helm install <release> oci://ghcr.io/faridlamaul/charts/shipform --version ${VERSION}\`."

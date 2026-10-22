@@ -1,6 +1,6 @@
-# application-chart
+# shipform
 
-`application-chart` is a generic Helm chart for Kubernetes application workloads. It is designed as a reusable base chart for APIs, backend services, workers, internal services, StatefulSets, Jobs, and CronJobs.
+`shipform` is a generic Helm chart for Kubernetes application workloads. It is designed as a reusable base chart for APIs, backend services, workers, internal services, StatefulSets, Jobs, and CronJobs.
 
 The design principle is:
 
@@ -20,7 +20,7 @@ The design principle is:
 ## Chart Structure
 
 ```text
-application-chart/
+shipform/
   Chart.yaml
   values.yaml
   values.schema.json
@@ -55,8 +55,8 @@ application-chart/
 From GHCR (OCI):
 
 ```bash
-helm upgrade --install user-api oci://ghcr.io/faridlamaul/charts/application-chart \
-  --version 0.3.0 \
+helm upgrade --install user-api oci://ghcr.io/faridlamaul/charts/shipform \
+  --version 0.4.0 \
   --namespace applications \
   --create-namespace \
   -f values-user-api.yaml
@@ -65,23 +65,23 @@ helm upgrade --install user-api oci://ghcr.io/faridlamaul/charts/application-cha
 From the Helm repository:
 
 ```bash
-helm repo add application-chart https://faridlamaul.github.io/application-chart
-helm upgrade --install user-api application-chart/application-chart \
-  --version 0.3.0 --namespace applications --create-namespace -f values-user-api.yaml
+helm repo add shipform https://faridlamaul.github.io/shipform
+helm upgrade --install user-api shipform/shipform \
+  --version 0.4.0 --namespace applications --create-namespace -f values-user-api.yaml
 ```
 
 With no values file, the chart deploys `nginxinc/nginx-unprivileged` on port 8080 as a non-root user, which is useful to check a cluster before deploying a real image.
 
 ## Upgrade
 
-Read [CHANGELOG.md](CHANGELOG.md) before upgrading across minor versions; 0.3.0 has upgrade steps.
+Read [CHANGELOG.md](CHANGELOG.md) before upgrading across minor versions; 0.3.0 and 0.4.0 have upgrade steps.
 
 ```bash
-helm diff upgrade user-api oci://ghcr.io/faridlamaul/charts/application-chart --version 0.3.0 \
+helm diff upgrade user-api oci://ghcr.io/faridlamaul/charts/shipform --version 0.4.0 \
   --namespace applications \
   -f values-user-api.yaml
 
-helm upgrade --install user-api oci://ghcr.io/faridlamaul/charts/application-chart --version 0.3.0 \
+helm upgrade --install user-api oci://ghcr.io/faridlamaul/charts/shipform --version 0.4.0 \
   --namespace applications \
   -f values-user-api.yaml
 ```
@@ -316,7 +316,7 @@ spec:
   source:
     repoURL: https://github.com/example/platform-charts.git
     targetRevision: main
-    path: helm-chart/application-chart
+    path: helm-chart/shipform
     helm:
       valueFiles:
         - examples/values-api.yaml
@@ -343,7 +343,7 @@ spec:
   interval: 5m
   chart:
     spec:
-      chart: ./helm-chart/application-chart
+      chart: ./helm-chart/shipform
       sourceRef:
         kind: GitRepository
         name: platform-charts
@@ -365,7 +365,7 @@ docker run --rm -v "$PWD:/apps" helmunittest/helm-unittest:4.3.0-1.2.1 .   # uni
 ## CI and Publishing
 
 - **`ci.yaml`** (pull requests, and before every publish): `helm lint --strict` and rendering of the defaults and every example with Helm 3 and Helm 4; kubeconform against Kubernetes 1.25 and 1.33 (including the ExternalSecret and ServiceMonitor CRDs); the helm-unittest suites; and a kind cluster that installs the defaults (plus `helm test`), a StatefulSet (per-pod DNS), the Redis example, and a Job that is upgraded with a changed pod template.
-- **`publish.yaml`** (every push to `main`): runs CI, then publishes only when the `version` in `Chart.yaml` has no `application-chart-<version>` tag yet. It pushes the chart to `oci://ghcr.io/faridlamaul/charts`, adds it to the GitHub Pages repository, and creates the tag with a GitHub Release. Bump `version` in `Chart.yaml` and add a CHANGELOG entry to release.
+- **`publish.yaml`** (every push to `main`): runs CI, then publishes only when the `version` in `Chart.yaml` has no `shipform-<version>` tag yet. It pushes the chart to `oci://ghcr.io/faridlamaul/charts`, adds it to the GitHub Pages repository, and creates the tag with a GitHub Release. Bump `version` in `Chart.yaml` and add a CHANGELOG entry to release.
 
 ## Common Troubleshooting
 

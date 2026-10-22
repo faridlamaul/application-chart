@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.0
+
+### Upgrade notes
+
+Read these before upgrading a 0.3.x release.
+
+- **The chart is renamed from `application-chart` to `shipform`.** It is published as `oci://ghcr.io/faridlamaul/charts/shipform` and in the Helm repository at `https://faridlamaul.github.io/shipform`. Point `helm upgrade` and GitOps sources at the new name.
+- **The chart name feeds resource names and the `app.kubernetes.io/name` selector label.** Selectors are immutable, so an existing release must keep the old name. Add this to its values before upgrading:
+
+  ```yaml
+  nameOverride: application-chart
+  ```
+
+  With it, resource names and selectors stay the same. Only the `helm.sh/chart` label and the headless Service label `application-chart/governing-service` (now `shipform/governing-service`) change; both are mutable. Releases that already set `nameOverride` need no change; `fullnameOverride` alone does not keep the selector.
+
+### Changed
+
+- Chart, repository, OCI path, Helm repository URL, release tags (`shipform-<version>`), and template helper names use `shipform`.
+
 ## 0.3.0
 
 ### Upgrade notes

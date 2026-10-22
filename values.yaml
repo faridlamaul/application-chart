@@ -1,4 +1,4 @@
-# Default values for application-chart.
+# Default values for shipform.
 # This file is intentionally generic. Do not commit real secrets here.
 
 nameOverride: ""

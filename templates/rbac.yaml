@@ -2,25 +2,25 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "application-chart.fullname" . }}
+  name: {{ include "shipform.fullname" . }}
   labels:
-    {{- include "application-chart.labels" . | nindent 4 }}
+    {{- include "shipform.labels" . | nindent 4 }}
 rules:
   {{- toYaml .Values.rbac.rules | nindent 2 }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "application-chart.fullname" . }}
+  name: {{ include "shipform.fullname" . }}
   labels:
-    {{- include "application-chart.labels" . | nindent 4 }}
+    {{- include "shipform.labels" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "application-chart.serviceAccountName" . }}
+    name: {{ include "shipform.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: Role
-  name: {{ include "application-chart.fullname" . }}
+  name: {{ include "shipform.fullname" . }}
   apiGroup: rbac.authorization.k8s.io
 {{- end }}
 

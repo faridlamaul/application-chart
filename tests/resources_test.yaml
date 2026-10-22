@@ -27,7 +27,7 @@ tests:
             minAvailable: 1
             selector:
               matchLabels:
-                app.kubernetes.io/name: application-chart
+                app.kubernetes.io/name: shipform
                 app.kubernetes.io/instance: RELEASE-NAME
 
   - it: accepts maxUnavailable alone
@@ -115,7 +115,7 @@ tests:
     asserts:
       - notEqual:
           path: metadata.labels["app.kubernetes.io/name"]
-          value: application-chart
+          value: shipform
       - equal:
           path: spec.securityContext.runAsNonRoot
           value: true
