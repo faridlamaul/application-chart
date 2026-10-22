@@ -1,0 +1,144 @@
+suite: persistence
+templates:
+  - templates/pvc.yaml
+  - templates/deployment.yaml
+  - templates/validate.yaml
+release:
+  name: app
+tests:
+  - it: renders nothing by default
+    template: templates/pvc.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: creates a PVC with keep policy
+    set:
+      persistence.enabled: true
+    template: templates/pvc.yaml
+    asserts:
+      - isKind:
+          of: PersistentVolumeClaim
+      - equal:
+          path: metadata.name
+          value: app-shipform-data
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
+      - equal:
+          path: spec.resources.requests.storage
+          value: 1Gi
+      - equal:
+          path: spec.accessModes
+          value: [ReadWriteOnce]
+      - notExists:
+          path: spec.storageClassName
+
+  - it: omits the keep policy when keep is false
+    set:
+      persistence.enabled: true
+      persistence.keep: false
+    template: templates/pvc.yaml
+    asserts:
+      - notExists:
+          path: metadata.annotations["helm.sh/resource-policy"]
+
+  - it: renders an empty storageClassName when set to ""
+    set:
+      persistence.enabled: true
+      persistence.storageClassName: ""
+    template: templates/pvc.yaml
+    asserts:
+      - exists:
+          path: spec.storageClassName
+      - equal:
+          path: spec.storageClassName
+          value: ""
+
+  - it: renders a named storageClassName
+    set:
+      persistence.enabled: true
+      persistence.storageClassName: fast
+    template: templates/pvc.yaml
+    asserts:
+      - equal:
+          path: spec.storageClassName
+          value: fast
+
+  - it: mounts the claim in the main container
+    set:
+      persistence.enabled: true
+    template: templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: persistence
+            mountPath: /data
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: persistence
+            persistentVolumeClaim:
+              claimName: app-shipform-data
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+
+  - it: renders subPath only when set
+    set:
+      persistence.enabled: true
+      persistence.subPath: files
+    template: templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: persistence
+            mountPath: /data
+            subPath: files
+
+  - it: does not mount anything when disabled
+    template: templates/deployment.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: persistence
+            mountPath: /data
+      - notExists:
+          path: spec.template.spec.volumes[1]
+
+  - it: uses an existing claim without creating one
+    set:
+      persistence.enabled: true
+      persistence.existingClaim: shared
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/pvc.yaml
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: persistence
+            persistentVolumeClaim:
+              claimName: shared
+        template: templates/deployment.yaml
+
+  - it: fails for a StatefulSet
+    set:
+      persistence.enabled: true
+      workload.type: StatefulSet
+    template: templates/validate.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: persistence is not supported for workload.type StatefulSet
+
+  - it: rejects unknown persistence keys
+    set:
+      persistence.bogus: 1
+    template: templates/pvc.yaml
+    asserts:
+      - failedTemplate: {}

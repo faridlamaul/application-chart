@@ -76,6 +76,22 @@ tmpDir:
   sizeLimit: 64Mi
   medium: ""
 
+# A standalone PersistentVolumeClaim mounted in the main container. Not
+# supported for workload.type StatefulSet (use statefulSet.volumeClaimTemplates).
+# ReadWriteOnce with more than one replica, or with RollingUpdate, can leave new
+# pods pending. The chart-created claim is kept on uninstall when keep is true.
+persistence:
+  enabled: false
+  existingClaim: ""
+  storageClassName: null # null: cluster default; "": no class
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
+  mountPath: /data
+  subPath: ""
+  annotations: {}
+  keep: true
+
 # Kubernetes injects one set of environment variables per Service in the
 # namespace when this is true. Use DNS names instead.
 enableServiceLinks: false

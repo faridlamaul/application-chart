@@ -34,6 +34,6 @@ spec:
           {{- end }}
         spec:
           {{- $container := dict "command" .Values.cronjob.command "args" .Values.cronjob.args "env" .Values.cronjob.env "envFrom" .Values.cronjob.envFrom "resources" .Values.cronjob.resources "ports" (list) "livenessProbe" (dict) "readinessProbe" (dict) "startupProbe" (dict) -}}
-          {{- include "shipform.podSpec" (dict "root" . "container" $container "restartPolicy" .Values.cronjob.restartPolicy) | nindent 10 }}
+          {{- include "shipform.podSpec" (dict "root" . "container" $container "restartPolicy" .Values.cronjob.restartPolicy "mountPersistence" true) | nindent 10 }}
 {{- end }}
 

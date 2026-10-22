@@ -64,3 +64,7 @@ the main Service when it is headless, otherwise the chart's -headless Service.
 {{- define "shipform.externalSecretTargetName" -}}
 {{- default (include "shipform.secretName" .) .Values.externalSecret.target.name -}}
 {{- end -}}
+
+{{- define "shipform.persistenceClaimName" -}}
+{{- default (printf "%s-data" (include "shipform.fullname" . | trunc 58 | trimSuffix "-")) .Values.persistence.existingClaim -}}
+{{- end -}}

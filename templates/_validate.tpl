@@ -10,6 +10,9 @@ on each render. Renders nothing; calls `fail` on invalid combinations.
 {{- end -}}
 {{- end -}}
 {{- end -}}
+{{- if and .Values.persistence.enabled (eq .Values.workload.type "StatefulSet") -}}
+{{- fail "persistence is not supported for workload.type StatefulSet; use statefulSet.volumeClaimTemplates" -}}
+{{- end -}}
 {{- range $kind := list "httpRoute" "grpcRoute" -}}
 {{- $route := index $.Values $kind -}}
 {{- if $route.enabled -}}

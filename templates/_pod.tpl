@@ -42,6 +42,13 @@ true
 {{- if include "shipform.needsTmpDir" $root -}}
 {{- $volumeMounts = append $volumeMounts (dict "name" "tmp" "mountPath" "/tmp") -}}
 {{- end -}}
+{{- if and .mountPersistence $root.Values.persistence.enabled -}}
+{{- $mount := dict "name" "persistence" "mountPath" $root.Values.persistence.mountPath -}}
+{{- with $root.Values.persistence.subPath -}}
+{{- $_ := set $mount "subPath" . -}}
+{{- end -}}
+{{- $volumeMounts = append $volumeMounts $mount -}}
+{{- end -}}
 {{- $command := default $root.Values.command $container.command -}}
 {{- $args := default $root.Values.args $container.args -}}
 {{- /* A key present in the container overrides the root value, even when empty. */ -}}
@@ -130,7 +137,7 @@ initContainers:
 {{ toYaml . | nindent 2 }}
 {{- end }}
 containers:
-{{ include "shipform.container" (dict "root" $root "container" $container) | nindent 2 }}
+{{ include "shipform.container" (dict "root" $root "container" $container "mountPersistence" .mountPersistence) | nindent 2 }}
 {{- with $root.Values.extraContainers }}
 {{ toYaml . | nindent 2 }}
 {{- end }}
@@ -141,6 +148,9 @@ containers:
 {{- $_ := set $emptyDir "medium" . -}}
 {{- end -}}
 {{- $volumes = append $volumes (dict "name" "tmp" "emptyDir" $emptyDir) -}}
+{{- end -}}
+{{- if $root.Values.persistence.enabled -}}
+{{- $volumes = append $volumes (dict "name" "persistence" "persistentVolumeClaim" (dict "claimName" (include "shipform.persistenceClaimName" $root))) -}}
 {{- end -}}
 {{- with $volumes }}
 volumes:

@@ -268,6 +268,46 @@
         }
       }
     },
+    "persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "existingClaim": {
+          "type": "string"
+        },
+        "storageClassName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "accessModes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "size": {
+          "type": "string"
+        },
+        "mountPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subPath": {
+          "type": "string"
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "keep": {
+          "type": "boolean"
+        }
+      }
+    },
     "enableServiceLinks": {
       "type": "boolean"
     },

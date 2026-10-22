@@ -43,5 +43,5 @@ spec:
         {{- end }}
       {{- end }}
     spec:
-      {{- include "shipform.podSpec" (dict "root" . "restartPolicy" "Always") | nindent 6 }}
+      {{- include "shipform.podSpec" (dict "root" . "restartPolicy" "Always" "mountPersistence" true) | nindent 6 }}
 {{- end }}
