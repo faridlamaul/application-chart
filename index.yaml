@@ -23,7 +23,7 @@ entries:
     - https://github.com/faridlamaul/application-chart
     type: application
     urls:
-    - https://faridlamaul.github.io/application-chart/application-chart-0.3.0.tgz
+    - https://faridlamaul.github.io/shipform/application-chart-0.3.0.tgz
     version: 0.3.0
   - apiVersion: v2
     appVersion: 1.0.0
@@ -44,6 +44,6 @@ entries:
     name: application-chart
     type: application
     urls:
-    - https://faridlamaul.github.io/application-chart/application-chart-0.2.0.tgz
+    - https://faridlamaul.github.io/shipform/application-chart-0.2.0.tgz
     version: 0.2.0
 generated: "2026-10-17T20:34:46.794301152Z"
