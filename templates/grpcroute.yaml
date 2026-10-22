@@ -1,0 +1,21 @@
+{{- if .Values.grpcRoute.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: {{ include "shipform.fullname" . }}
+  labels:
+    {{- include "shipform.labelsWith" (dict "root" . "extra" .Values.grpcRoute.labels) | nindent 4 }}
+  {{- with .Values.grpcRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- toYaml .Values.grpcRoute.parentRefs | nindent 4 }}
+  {{- with .Values.grpcRoute.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- include "shipform.routeRules" (dict "root" . "rules" .Values.grpcRoute.rules "default" "grpc") | nindent 4 }}
+{{- end }}

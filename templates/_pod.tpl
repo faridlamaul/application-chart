@@ -166,3 +166,44 @@ topologySpreadConstraints:
 terminationGracePeriodSeconds: {{ $root.Values.terminationGracePeriodSeconds }}
 {{- end }}
 {{- end -}}
+
+{{/*
+Resolve a service port reference to its number. Takes (dict "root" $ "port" <string|int>).
+A name matches service.ports[].name; a number matches service.ports[].port.
+Compares with toString so int, int64 and float64 (from --set) all work.
+Returns the number as an integer string, or "" when no entry matches.
+*/ -}}
+{{- define "shipform.servicePortNumber" -}}
+{{- $want := toString .port -}}
+{{- $found := "" -}}
+{{- range (.root.Values.service.ports | default list) -}}
+{{- if and (eq $found "") (or (eq (toString .name) $want) (eq (toString .port) $want)) -}}
+{{- $found = printf "%d" (int64 .port) -}}
+{{- end -}}
+{{- end -}}
+{{- $found -}}
+{{- end -}}
+
+{{/*
+Render the rules of a Gateway API route. Takes (dict "root" $ "rules" <list> "default" <port>).
+*/ -}}
+{{- define "shipform.routeRules" -}}
+{{- $root := .root -}}
+{{- range .rules }}
+- {{- with .matches }}
+  matches:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .filters }}
+  filters:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .timeouts }}
+  timeouts:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  backendRefs:
+    - name: {{ include "shipform.fullname" $root }}
+      port: {{ include "shipform.servicePortNumber" (dict "root" $root "port" (default $.default .servicePort)) }}
+{{- end }}
+{{- end -}}

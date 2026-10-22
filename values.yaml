@@ -108,6 +108,30 @@ service:
   internalTrafficPolicy: ""
   externalTrafficPolicy: ""
 
+httpRoute:
+  enabled: false
+  annotations: {}
+  labels: {}
+  parentRefs: []
+  hostnames: []
+  rules:
+    - matches:
+        - path: {type: PathPrefix, value: /}
+      filters: []
+      timeouts: {}
+      servicePort: http
+
+grpcRoute:
+  enabled: false
+  annotations: {}
+  labels: {}
+  parentRefs: []
+  hostnames: []
+  rules:
+    - matches: []
+      filters: []
+      servicePort: grpc
+
 ingress:
   enabled: false
   className: ""

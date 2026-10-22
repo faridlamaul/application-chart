@@ -10,4 +10,19 @@ on each render. Renders nothing; calls `fail` on invalid combinations.
 {{- end -}}
 {{- end -}}
 {{- end -}}
+{{- range $kind := list "httpRoute" "grpcRoute" -}}
+{{- $route := index $.Values $kind -}}
+{{- if $route.enabled -}}
+{{- if not $.Values.service.enabled -}}
+{{- fail (printf "%s.enabled requires service.enabled=true; the route backend is the chart Service" $kind) -}}
+{{- end -}}
+{{- $default := ternary "http" "grpc" (eq $kind "httpRoute") -}}
+{{- range $i, $rule := $route.rules -}}
+{{- $port := default $default $rule.servicePort -}}
+{{- if eq (include "shipform.servicePortNumber" (dict "root" $ "port" $port)) "" -}}
+{{- fail (printf "%s.rules[%d].servicePort %q matches no service.ports entry" $kind $i (toString $port)) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
