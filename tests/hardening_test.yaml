@@ -2,6 +2,7 @@ suite: security hardening
 templates:
   - templates/deployment.yaml
   - templates/networkpolicy.yaml
+  - templates/validate.yaml
 tests:
   - it: defaults to a read-only root with a /tmp emptyDir
     template: templates/deployment.yaml
@@ -177,3 +178,32 @@ tests:
             privileged: true
     asserts:
       - failedTemplate: {}
+
+  - it: rejects a user volume named tmp while tmpDir is enabled
+    template: templates/validate.yaml
+    set:
+      volumes:
+        - name: tmp
+          emptyDir: {}
+    asserts:
+      - failedTemplate:
+          errorPattern: 'volumes: the name "tmp" is reserved while tmpDir.enabled is true'
+
+  - it: accepts a user volume named tmp when tmpDir is disabled
+    template: templates/validate.yaml
+    set:
+      tmpDir.enabled: false
+      volumes:
+        - name: tmp
+          emptyDir: {}
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an empty allowDNS peer list
+    template: templates/networkpolicy.yaml
+    set:
+      networkPolicy.enabled: true
+      networkPolicy.allowDNS.to: []
+    asserts:
+      - failedTemplate:
+          errorPattern: allowDNS

@@ -719,7 +719,8 @@
               "type": "boolean"
             },
             "to": {
-              "type": "array"
+              "type": "array",
+              "minItems": 1
             }
           }
         },
