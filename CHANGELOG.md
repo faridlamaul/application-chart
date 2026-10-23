@@ -14,10 +14,28 @@ Read these before upgrading a 0.3.x release.
   ```
 
   With it, resource names and selectors stay the same. Only the `helm.sh/chart` label and the headless Service label `application-chart/governing-service` (now `shipform/governing-service`) change; both are mutable. Releases that already set `nameOverride` need no change; `fullnameOverride` alone does not keep the selector.
+- **Containers run with a read-only root filesystem.** `securityContext.readOnlyRootFilesystem` now defaults to `true`, and an `emptyDir` is mounted at `/tmp`. Applications that write elsewhere fail. Mount a volume at that path, or set `securityContext.readOnlyRootFilesystem: false` to restore the old behavior.
+- **The `/tmp` volume is named `tmp` and is reserved.** A user volume named `tmp` now fails the render. Rename it, or set `tmpDir.enabled: false` to remove the chart volume. The chart skips its volume when `volumeMounts` already mounts `/tmp`.
+- **Pods no longer receive Service environment variables.** `enableServiceLinks` now defaults to `false`. Use DNS names instead, or set `enableServiceLinks: true` to restore the old behavior.
+- **The schema rejects privileged containers and `hostPath` volumes.** `securityContext.privileged: true` and any `hostPath` volume now fail the render. These guards have no opt-out.
+- **The schema allows only `NET_BIND_SERVICE` in `securityContext.capabilities.add`.** Any other added capability fails the render. This guard has no opt-out.
+- **NetworkPolicies that include Egress get a DNS rule.** `networkPolicy.allowDNS` allows port 53 to CoreDNS in `kube-system`. Set `networkPolicy.allowDNS.enabled: false` to remove it, or change `networkPolicy.allowDNS.to`.
 
 ### Changed
 
 - Chart, repository, OCI path, Helm repository URL, release tags (`shipform-<version>`), and template helper names use `shipform`.
+
+### Added
+
+- `httpRoute` and `grpcRoute` render Gateway API routes.
+- `persistence` adds a PersistentVolumeClaim named `<fullname>-data`. It is kept on uninstall while `persistence.keep` is `true`. Use `persistence.existingClaim` for an existing claim.
+- `jobs` and `cronJobs` define companion Jobs and CronJobs. A Job with an empty `hook` runs as `post-install,post-upgrade`.
+- `keda` renders a KEDA ScaledObject, and `verticalPodAutoscaler` renders a VerticalPodAutoscaler.
+- `prometheusRule` and `podMonitor` render Prometheus Operator resources. `podMonitor` cannot be combined with `serviceMonitor`.
+- `extraObjects` renders additional Kubernetes objects with the release.
+- `tmpDir` configures the `/tmp` volume: `enabled`, `sizeLimit`, and `medium`.
+- `networkPolicy.allowDNS` controls the DNS egress rule.
+- CI installs the chart into a namespace that enforces the restricted Pod Security Standard.
 
 ## 0.3.0
 
