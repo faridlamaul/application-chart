@@ -18,6 +18,9 @@ spec:
   {{- $egress := .Values.networkPolicy.egress | default list }}
   {{- $allowDNS := .Values.networkPolicy.allowDNS }}
   {{- if and $allowDNS.enabled (has "Egress" .Values.networkPolicy.policyTypes) }}
+  {{- if not $allowDNS.to }}
+  {{- fail "networkPolicy.allowDNS.to must list at least one peer when allowDNS.enabled is true" }}
+  {{- end }}
   {{- $dnsPorts := list (dict "port" 53 "protocol" "UDP") (dict "port" 53 "protocol" "TCP") }}
   {{- $egress = prepend $egress (dict "to" $allowDNS.to "ports" $dnsPorts) }}
   {{- end }}

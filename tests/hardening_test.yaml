@@ -207,3 +207,13 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: allowDNS
+
+  - it: rejects a null allowDNS peer list
+    template: templates/networkpolicy.yaml
+    set:
+      networkPolicy.enabled: true
+      networkPolicy.policyTypes: [Egress]
+      networkPolicy.allowDNS.to: null
+    asserts:
+      - failedTemplate:
+          errorPattern: networkPolicy.allowDNS.to must list at least one peer when allowDNS.enabled is true
