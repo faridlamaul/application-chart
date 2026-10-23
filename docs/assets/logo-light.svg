@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="460" height="128" viewBox="0 0 460 128" role="img" aria-label="shipform">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#326CE5"/>
+      <stop offset="1" stop-color="#14B8A6"/>
+    </linearGradient>
+    <linearGradient id="gi" gradientUnits="userSpaceOnUse" x1="12" y1="12" x2="116" y2="116">
+      <stop offset="0" stop-color="#326CE5"/>
+      <stop offset="1" stop-color="#14B8A6"/>
+    </linearGradient>
+  </defs>
+  <path d="M64 64L64.0 14.0M64 64L99.4 28.6M64 64L114.0 64.0M64 64L99.4 99.4M64 64L64.0 114.0M64 64L28.6 99.4M64 64L14.0 64.0M64 64L28.6 28.6" stroke="url(#gi)" stroke-width="7" stroke-linecap="round"/>
+  <g fill="url(#gi)">
+    <circle cx="100.8" cy="27.2" r="7"/><circle cx="116.0" cy="64.0" r="7"/><circle cx="100.8" cy="100.8" r="7"/><circle cx="64.0" cy="116.0" r="7"/><circle cx="27.2" cy="100.8" r="7"/><circle cx="12.0" cy="64.0" r="7"/><circle cx="27.2" cy="27.2" r="7"/>
+  </g>
+  <circle cx="64" cy="12" r="7" fill="#FBBF24"/>
+  <circle cx="64" cy="64" r="40" fill="url(#gi)"/>
+  <circle cx="64" cy="64" r="40" fill="none" stroke="#fff" stroke-width="3" stroke-opacity=".35"/>
+  <path d="M64 37L89 50L64 63L39 50Z" fill="#fff" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M39 63L64 76L89 63" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" stroke-opacity=".85"/>
+  <path d="M39 76L64 89L89 76" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" stroke-opacity=".6"/>
+  <text x="140" y="86" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="62" font-weight="700" letter-spacing="-1" fill="#0F172A">ship<tspan fill="url(#g)">form</tspan></text>
+</svg>

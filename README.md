@@ -1,5 +1,12 @@
 <p align="center">
-  <strong>shipform: one Helm chart for APIs, workers, StatefulSets, Jobs and CronJobs, secure by default.</strong><br>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+    <img alt="shipform" src="docs/assets/logo-light.svg" width="360">
+  </picture>
+</p>
+
+<p align="center">
+  <strong>One Helm chart for APIs, workers, StatefulSets, Jobs and CronJobs, secure by default.</strong><br>
   Configure everything through values; the schema rejects unknown keys and unsafe settings.
 </p>
 
@@ -9,6 +16,11 @@
   <a href="https://github.com/faridlamaul/shipform/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/faridlamaul/shipform?sort=semver"></a>
   <a href="https://kubernetes.io"><img alt="Kubernetes 1.25+" src="https://img.shields.io/badge/Kubernetes-1.25+-326CE5?style=flat&logo=kubernetes"></a>
   <a href="https://helm.sh"><img alt="Helm 3 and 4" src="https://img.shields.io/badge/Helm-3%20%7C%204-0F1689?style=flat&logo=helm"></a>
+  <a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
+</p>
+
+<p align="center">
+  <img alt="shipform rendering an API example, its secure pod defaults, and a schema error for a privileged container" src="docs/assets/demo.gif" width="800">
 </p>
 
 shipform deploys one application workload per Helm release: a Deployment, StatefulSet, Job or CronJob, plus the Service, routing, scaling, secrets and monitoring resources it needs.
@@ -33,7 +45,9 @@ shipform deploys one application workload per Helm release: a Deployment, Statef
 - [Troubleshooting](#troubleshooting)
 - [Scope](#scope)
 - [Development](#development)
+- [Contributing](#contributing)
 - [Ownership](#ownership)
+- [License](#license)
 
 </details>
 
@@ -110,7 +124,7 @@ The default `containerPorts` (`http`, 8080) and `service.ports` (`http`, 80 to `
 
 ## Features
 
-Each row is a top-level block in [`values.yaml`](values.yaml). The example column links to a working values file; `—` means there is no example, so the link goes to `values.yaml` and names the key.
+Each row is a top-level block in [`values.yaml`](values.yaml), with a working example values file. `—` marks a block with no example; its link names the key in `values.yaml`.
 
 | Block | What it renders | Example |
 |---|---|---|
@@ -146,11 +160,15 @@ Each row is a top-level block in [`values.yaml`](values.yaml). The example colum
 
 The default install runs in a namespace that enforces the restricted Pod Security Standard; CI checks this on kind. Each default below can be relaxed per release, except the schema guards.
 
+<p align="center">
+  <img alt="Rendered defaults: no ServiceAccount token, no Service links, non-root, RuntimeDefault seccomp, no privilege escalation, all capabilities dropped, read-only root filesystem" src="docs/assets/render.png" width="800">
+</p>
+
 | Default | Values | How to relax |
 |---|---|---|
-| Run as non-root with the `RuntimeDefault` seccomp profile | `podSecurityContext.runAsNonRoot: true` | For an image that starts as root, set `podSecurityContext.runAsUser` to its unprivileged user (see [values-statefulset.yaml](examples/values-statefulset.yaml)). Setting `runAsNonRoot: false` fails the restricted standard. |
+| Run as non-root with the `RuntimeDefault` seccomp profile | `podSecurityContext.runAsNonRoot: true` | An image that starts as root fails with a non-root error. Set `podSecurityContext.runAsUser` to its unprivileged user (see [values-statefulset.yaml](examples/values-statefulset.yaml)). Setting `runAsNonRoot: false` fails the restricted standard. |
 | No privilege escalation, all capabilities dropped | `securityContext.allowPrivilegeEscalation: false`, `securityContext.capabilities.drop: [ALL]` | Add `NET_BIND_SERVICE` under `securityContext.capabilities.add` to bind ports below 1024. No other capability is allowed. |
-| Read-only root filesystem | `securityContext.readOnlyRootFilesystem: true` | Mount a volume at each path the application writes to, or set `securityContext.readOnlyRootFilesystem: false`. |
+| Read-only root filesystem | `securityContext.readOnlyRootFilesystem: true` | A write outside `/tmp` logs `Read-only file system`. Mount a volume at each path the application writes to, or set `securityContext.readOnlyRootFilesystem: false`. |
 | Writable `/tmp` | `tmpDir.enabled: true`, `sizeLimit: 64Mi` | Set `tmpDir.enabled: false` to remove it. Set `tmpDir.medium: Memory` for a tmpfs that counts against the memory limit. The chart skips its volume when `volumeMounts` already mounts `/tmp`. |
 | No Service environment variables | `enableServiceLinks: false` | Set `enableServiceLinks: true`. Prefer DNS names. |
 | No ServiceAccount token in the pod | `serviceAccount.automount: false` | Set `serviceAccount.automount: true` when the pod calls the Kubernetes API, for example with `rbac.rules`. It applies to the ServiceAccount and the pod. |
@@ -162,7 +180,9 @@ Guards with no opt-out. The schema rejects these values in the main container, i
 - Any `hostPath` volume.
 - Any entry in `securityContext.capabilities.add` other than `NET_BIND_SERVICE`.
 
-The volume name `tmp` is reserved while the chart adds its own `/tmp` volume. A user volume named `tmp` then fails the render. Rename it, set `tmpDir.enabled: false`, or mount your own volume at `/tmp`, as [values-secure-production.yaml](examples/values-secure-production.yaml) does.
+<p align="center">
+  <img alt="helm template fails with a schema error for securityContext.privileged=true" src="docs/assets/schema-guard.png" width="800">
+</p>
 
 Other recommendations: pin image tags, prefer `externalSecret` over `secret` for real credentials, keep `rbac.rules` least-privilege, and enable `networkPolicy` where the CNI enforces it.
 
@@ -222,9 +242,8 @@ helm upgrade user-api oci://ghcr.io/faridlamaul/charts/shipform \
 |---|---|---|
 | `additional properties '…' not allowed` | Unknown or misspelled key | Fix the key; the schema rejects keys the chart does not read. |
 | Schema error on `privileged`, `hostPath` or `capabilities.add` | A guard with no opt-out | Remove the setting. |
-| `volumes: the name "tmp" is reserved …` | A user volume named `tmp` while the chart adds `/tmp` | Rename the volume or set `tmpDir.enabled: false`. |
-| `Read-only file system` in the pod logs | The application writes outside `/tmp` | Mount a volume at that path, or set `securityContext.readOnlyRootFilesystem: false`. |
-| Pod fails with a non-root error | The image starts as root | Set `podSecurityContext.runAsUser` to the image's unprivileged user. |
+| `volumes: the name "tmp" is reserved …` | A user volume named `tmp` while the chart adds its own `/tmp` volume | Rename the volume, set `tmpDir.enabled: false`, or mount your own volume at `/tmp` as [values-secure-production.yaml](examples/values-secure-production.yaml) does. |
+| `Read-only file system` or a non-root error | A secure default | See the relax column in [Security defaults](#security-defaults). |
 | `… servicePort "x" matches no service.ports entry` | A route rule names a missing port | Use a name or number from `service.ports`. |
 | `autoscaling.enabled is supported only for workload.type Deployment` | HPA on another workload type | Disable `autoscaling`, or use `keda` for a StatefulSet. |
 | New pod stays `Pending` after an upgrade with `persistence` | ReadWriteOnce volume held by the old pod | Use `deploymentStrategy.type: Recreate` and one replica. |
@@ -240,7 +259,7 @@ helm upgrade user-api oci://ghcr.io/faridlamaul/charts/shipform \
 
 ## Development
 
-Run the checks that CI runs, from the repository root.
+Run the checks that CI runs, from the repository root. `make lint` and `make test` wrap the first two steps.
 
 Lint and render the defaults and every example:
 
@@ -280,6 +299,14 @@ To release:
 
 The tag is created last, so a failed publish can be re-run. A push that does not change `version` publishes nothing.
 
+## Contributing
+
+To re-record the demo and the two terminal screenshots after a change to the output, install [VHS](https://github.com/charmbracelet/vhs) and run `make demo`. The tape in [`docs/demo/demo.tape`](docs/demo/demo.tape) renders this chart with the local `helm`, so it needs no registry or cluster.
+
 ## Ownership
 
 Maintainer: af/faridlamaul · Repository: <https://github.com/faridlamaul/shipform> · Issues: <https://github.com/faridlamaul/shipform/issues>
+
+## License
+
+MIT License © 2026 Ahmad Lamaul Farid.

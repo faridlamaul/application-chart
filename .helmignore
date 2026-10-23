@@ -9,6 +9,7 @@
 *.bak
 # helm-unittest suites; a bare "tests/" would also drop templates/tests/
 tests/*_test.yaml
-# spec, plan, and scratch files must not ship in the chart package
+# docs, spec, plan, scratch files and the Makefile must not ship in the chart package
 docs/
+Makefile
 .superpowers/
