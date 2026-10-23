@@ -1,6 +1,8 @@
 # Design: shipform resource templates and hardening
 
-Status: Draft · Author: af/faridlamaul · Date: 2026-10-23 · Scope: shipform chart 0.4.0
+| Status | Author | Date | Scope |
+| --- | --- | --- | --- |
+| Final | af/faridlamaul | 2026-10-23 | shipform chart 0.4.0 |
 
 ## Goal
 
