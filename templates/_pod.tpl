@@ -44,6 +44,23 @@ resources only from its own overrides.
 {{- $envFrom := concat ($root.Values.envFrom | default list) ($container.envFrom | default list) -}}
 {{- $resources := default $root.Values.resources $container.resources -}}
 {{- $volumeMounts := concat ($root.Values.volumeMounts | default list) ($container.volumeMounts | default list) -}}
+{{- if .companion -}}
+{{- /* A companion pod has only the root volumes and the chart tmp volume; skip mounts without a volume, such as StatefulSet claim templates. */ -}}
+{{- $volumeNames := list -}}
+{{- range ($root.Values.volumes | default list) -}}
+{{- $volumeNames = append $volumeNames (toString .name) -}}
+{{- end -}}
+{{- if include "shipform.needsTmpDir" $root -}}
+{{- $volumeNames = append $volumeNames "tmp" -}}
+{{- end -}}
+{{- $kept := list -}}
+{{- range $volumeMounts -}}
+{{- if has (toString .name) $volumeNames -}}
+{{- $kept = append $kept . -}}
+{{- end -}}
+{{- end -}}
+{{- $volumeMounts = $kept -}}
+{{- end -}}
 {{- if include "shipform.needsTmpDir" $root -}}
 {{- $volumeMounts = append $volumeMounts (dict "name" "tmp" "mountPath" "/tmp") -}}
 {{- end -}}
@@ -252,6 +269,7 @@ Render the rules of a Gateway API route. Takes (dict "root" $ "rules" <list> "de
 Pod spec of a companion Job or CronJob. Takes (dict "root" $ "job" <entry>).
 The container inherits the root image, env, envFrom, volumeMounts and
 securityContext; an entry's image and securityContext replace the root value.
+Root volumeMounts without a matching volume in the companion pod are skipped.
 command, args and resources come only from the entry.
 */ -}}
 {{- define "shipform.companionPodSpec" -}}

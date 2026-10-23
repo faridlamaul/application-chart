@@ -404,3 +404,71 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: schedule
+
+  - it: skips root mounts that have no volume in the companion pod
+    set:
+      workload.type: StatefulSet
+      statefulSet.volumeClaimTemplates:
+        - metadata:
+            name: data
+          spec:
+            accessModes: [ReadWriteOnce]
+            resources:
+              requests:
+                storage: 1Gi
+      volumeMounts:
+        - name: data
+          mountPath: /data
+      jobs.migrate.enabled: true
+      cronJobs.cleanup:
+        enabled: true
+        schedule: "0 3 * * *"
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: data
+            mountPath: /data
+        template: templates/companion-jobs.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+        template: templates/companion-jobs.yaml
+      - notContains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].volumeMounts
+          content:
+            name: data
+            mountPath: /data
+        template: templates/companion-cronjobs.yaml
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+        template: templates/companion-cronjobs.yaml
+
+  - it: keeps root mounts backed by a root volume in the companion pod
+    set:
+      volumes:
+        - name: config
+          configMap:
+            name: app-config
+      volumeMounts:
+        - name: config
+          mountPath: /etc/app
+      jobs.migrate.enabled: true
+    template: templates/companion-jobs.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: config
+            mountPath: /etc/app
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: config
+            configMap:
+              name: app-config
