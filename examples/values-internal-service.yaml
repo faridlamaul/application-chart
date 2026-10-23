@@ -32,12 +32,4 @@ networkPolicy:
       ports:
         - protocol: TCP
           port: 8080
-  egress:
-    - to:
-        - namespaceSelector: {}
-      ports:
-        - protocol: TCP
-          port: 53
-        - protocol: UDP
-          port: 53
 

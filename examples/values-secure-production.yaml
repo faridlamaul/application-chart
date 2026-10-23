@@ -124,19 +124,8 @@ networkPolicy:
       ports:
         - protocol: TCP
           port: 8080
+  # networkPolicy.allowDNS adds the DNS egress rule.
   egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-          podSelector:
-            matchLabels:
-              k8s-app: kube-dns
-      ports:
-        - protocol: TCP
-          port: 53
-        - protocol: UDP
-          port: 53
     # PostgreSQL behind DATABASE_URL; replace the CIDR with your database subnet.
     - to:
         - ipBlock:

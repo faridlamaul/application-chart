@@ -73,7 +73,7 @@ To remove a release:
 helm uninstall user-api --namespace applications
 ```
 
-`helm uninstall` keeps the `persistence` claim while `persistence.keep` is `true`. It also leaves hook Jobs behind; `ttlSecondsAfterFinished` (default 300) removes them.
+`helm uninstall` keeps the `persistence` claim while `persistence.keep` is `true`. The main Job hook stays after uninstall until `ttlSecondsAfterFinished` (default 300) removes it. The default `hookDeletePolicy` deletes companion Jobs when they succeed.
 
 ## Quick start
 
@@ -110,37 +110,37 @@ The default `containerPorts` (`http`, 8080) and `service.ports` (`http`, 80 to `
 
 ## Features
 
-Each row is a top-level block in [`values.yaml`](values.yaml). The example column links to a working values file; `—` means there is no example, so the link goes to the block in `values.yaml`.
+Each row is a top-level block in [`values.yaml`](values.yaml). The example column links to a working values file; `—` means there is no example, so the link goes to `values.yaml` and names the key.
 
 | Block | What it renders | Example |
 |---|---|---|
 | `workload.type: Deployment` | Deployment for an HTTP API | [values-api.yaml](examples/values-api.yaml) |
 | `workload.type: Deployment`, no Service | Queue worker | [values-worker.yaml](examples/values-worker.yaml) |
 | `workload.type: StatefulSet`, `statefulSet` | StatefulSet with a headless governing Service and volume claim templates | [values-statefulset.yaml](examples/values-statefulset.yaml) |
-| `workload.type: Job`, `job` | Job run as a `post-install,post-upgrade` hook | — ([values.yaml](values.yaml#L318)) |
+| `workload.type: Job`, `job` | Job run as a `post-install,post-upgrade` hook | — ([`job`](values.yaml)) |
 | `workload.type: CronJob`, `cronjob` | CronJob | [values-cronjob.yaml](examples/values-cronjob.yaml) |
 | `jobs` | Companion Jobs, always Helm hooks, for example a migration | [values-migration-job.yaml](examples/values-migration-job.yaml) |
-| `cronJobs` | Companion CronJobs next to the main workload | — ([values.yaml](values.yaml#L389)) |
+| `cronJobs` | Companion CronJobs next to the main workload | — ([`cronJobs`](values.yaml)) |
 | `service` | ClusterIP, NodePort, LoadBalancer or headless Service | [values-internal-service.yaml](examples/values-internal-service.yaml) |
 | `ingress` | Ingress with TLS | [values-public-ingress.yaml](examples/values-public-ingress.yaml) |
 | `httpRoute` | Gateway API HTTPRoute | [values-gateway.yaml](examples/values-gateway.yaml) |
-| `grpcRoute` | Gateway API GRPCRoute | — ([values.yaml](values.yaml#L140)) |
+| `grpcRoute` | Gateway API GRPCRoute | — ([`grpcRoute`](values.yaml)) |
 | `autoscaling` | HorizontalPodAutoscaler (Deployment only) | [values-api.yaml](examples/values-api.yaml) |
 | `keda` | KEDA ScaledObject, including scale to zero | [values-worker-keda.yaml](examples/values-worker-keda.yaml) |
-| `verticalPodAutoscaler` | VerticalPodAutoscaler | — ([values.yaml](values.yaml#L217)) |
+| `verticalPodAutoscaler` | VerticalPodAutoscaler | — ([`verticalPodAutoscaler`](values.yaml)) |
 | `podDisruptionBudget` | PodDisruptionBudget | [values-api.yaml](examples/values-api.yaml) |
 | `persistence` | PersistentVolumeClaim `<fullname>-data` mounted in the main container | [values-persistence.yaml](examples/values-persistence.yaml) |
-| `tmpDir` | `emptyDir` mounted at `/tmp` | — ([values.yaml](values.yaml#L74)) |
+| `tmpDir` | `emptyDir` mounted at `/tmp` | — ([`tmpDir`](values.yaml)) |
 | `externalSecret` | ExternalSecret (`external-secrets.io/v1`) | [values-secure-production.yaml](examples/values-secure-production.yaml) |
-| `configMap` | ConfigMap `<fullname>-config` | — ([values.yaml](values.yaml#L163)) |
-| `secret` | Secret `<fullname>-secret`, for development use | — ([values.yaml](values.yaml#L170)) |
-| `serviceAccount`, `rbac` | ServiceAccount, namespaced Role and RoleBinding | — ([values.yaml](values.yaml#L99)) |
+| `configMap` | ConfigMap `<fullname>-config` | — ([`configMap`](values.yaml)) |
+| `secret` | Secret `<fullname>-secret`, for development use | — ([`secret`](values.yaml)) |
+| `serviceAccount`, `rbac` | ServiceAccount, namespaced Role and RoleBinding | — ([`serviceAccount`](values.yaml)) |
 | `networkPolicy` | NetworkPolicy with an optional DNS egress rule | [values-internal-service.yaml](examples/values-internal-service.yaml), [values-secure-production.yaml](examples/values-secure-production.yaml) |
 | `serviceMonitor` | Prometheus Operator ServiceMonitor | [values-secure-production.yaml](examples/values-secure-production.yaml) |
-| `podMonitor` | Prometheus Operator PodMonitor; cannot be combined with `serviceMonitor` | — ([values.yaml](values.yaml#L271)) |
-| `prometheusRule` | Prometheus Operator PrometheusRule | — ([values.yaml](values.yaml#L264)) |
-| `extraObjects` | Any extra manifest, rendered through `tpl` | — ([values.yaml](values.yaml#L286)) |
-| `tests` | `helm test` connection check | — ([values.yaml](values.yaml#L401)) |
+| `podMonitor` | Prometheus Operator PodMonitor; cannot be combined with `serviceMonitor` | — ([`podMonitor`](values.yaml)) |
+| `prometheusRule` | Prometheus Operator PrometheusRule | — ([`prometheusRule`](values.yaml)) |
+| `extraObjects` | Any extra manifest, rendered through `tpl` | — ([`extraObjects`](values.yaml)) |
+| `tests` | `helm test` connection check | — ([`tests`](values.yaml)) |
 
 ## Security defaults
 
@@ -176,7 +176,7 @@ Companion `jobs` and `cronJobs` run next to the main workload. Each key names on
 
 - **Every companion Job is a hook.** An empty `hook` means `post-install,post-upgrade`. Companion CronJobs are normal resources.
 - **Pre-install hooks run first.** A Job whose `hook` includes `pre-install` runs before the chart's ConfigMap, Secret, ExternalSecret and ServiceAccount exist. Helm creates those normal resources only after pre-install hooks finish. On the first install, read credentials from a Secret that already exists.
-- **ServiceAccount.** An explicit `serviceAccountName` on the entry wins. A `pre-install` hook uses the namespace `default` ServiceAccount while `serviceAccount.create` is `true`, because the chart's ServiceAccount does not exist yet. Every other companion uses the release ServiceAccount, or `serviceAccount.name` (default `default`) when `serviceAccount.create` is `false`.
+- **ServiceAccount.** An explicit `serviceAccountName` on the entry wins. A `pre-install` hook uses the namespace `default` ServiceAccount while `serviceAccount.create` is `true`, because the chart's ServiceAccount does not exist yet. Every other companion uses the release ServiceAccount. When `serviceAccount.create` is `false`, that is `serviceAccount.name`, or `default` when the name is empty.
 - **What a companion inherits.** It takes the root image, `imagePullSecrets`, `env`, `envFrom`, `volumes`, `volumeMounts`, pod and container security contexts, scheduling fields and `tmpDir`. It takes `command`, `args` and `resources` only from its own entry; empty means the image defaults and no resources. A companion skips each mount that has no volume in its pod, for example a StatefulSet claim template.
 - **Selectors.** Companion pods carry `app.kubernetes.io/name: <name>-<key>`, so the main Service, PodDisruptionBudget and NetworkPolicy do not select them.
 
@@ -214,7 +214,7 @@ helm upgrade user-api oci://ghcr.io/faridlamaul/charts/shipform \
   -f values-user-api.yaml
 ```
 
-0.4.0 also turns on the read-only root filesystem, the `/tmp` volume, `enableServiceLinks: false` and the schema guards. The CHANGELOG lists how to restore each old behavior.
+0.4.0 also turns on the read-only root filesystem, the `/tmp` volume, `enableServiceLinks: false` and the schema guards. The schema guards have no opt-out. The CHANGELOG lists how to restore the other behaviors.
 
 ## Troubleshooting
 

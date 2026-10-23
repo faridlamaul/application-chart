@@ -14,8 +14,8 @@ Read these before upgrading a 0.3.x release.
   ```
 
   With it, resource names and selectors stay the same. Only the `helm.sh/chart` label and the headless Service label `application-chart/governing-service` (now `shipform/governing-service`) change; both are mutable. Releases that already set `nameOverride` need no change; `fullnameOverride` alone does not keep the selector.
-- **Containers run with a read-only root filesystem.** `securityContext.readOnlyRootFilesystem` now defaults to `true`, and an `emptyDir` is mounted at `/tmp`. Applications that write elsewhere fail. Mount a volume at that path, or set `securityContext.readOnlyRootFilesystem: false` to restore the old behavior.
-- **The `/tmp` volume is named `tmp` and is reserved.** A user volume named `tmp` now fails the render. Rename it, or set `tmpDir.enabled: false` to remove the chart volume. The chart skips its volume when `volumeMounts` already mounts `/tmp`.
+- **Containers run with a read-only root filesystem.** `securityContext.readOnlyRootFilesystem` now defaults to `true`, and an `emptyDir` is mounted at `/tmp`. Applications that write elsewhere fail. Mount a volume at that path, or set `securityContext.readOnlyRootFilesystem: false` to restore the old behavior. Setting `tmpDir.enabled: false` also drops the `/tmp` mount.
+- **The `/tmp` volume is named `tmp` and is reserved.** A user volume named `tmp` fails the render while the chart adds its own `/tmp` volume. That holds while `tmpDir.enabled` is `true` and no user mount uses `/tmp`. Rename the user volume, or set `tmpDir.enabled: false` to remove the chart volume.
 - **Pods no longer receive Service environment variables.** `enableServiceLinks` now defaults to `false`. Use DNS names instead, or set `enableServiceLinks: true` to restore the old behavior.
 - **The schema rejects privileged containers and `hostPath` volumes.** `securityContext.privileged: true` and any `hostPath` volume now fail the render. These guards have no opt-out.
 - **The schema allows only `NET_BIND_SERVICE` in `securityContext.capabilities.add`.** Any other added capability fails the render. This guard has no opt-out.

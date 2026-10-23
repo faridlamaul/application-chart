@@ -141,7 +141,7 @@ jobs:
           helm upgrade batch . -n restricted "${job_args[@]}" --set 'job.env[0].name=RUN' --set-string 'job.env[0].value=2'
           kubectl -n restricted get job batch-shipform -o jsonpath='{.spec.template.spec.containers[0].env[0].value}' | grep -x 2
 
-      - name: Migration hook runs before the Deployment
+      - name: Migration hook runs and completes
         run: |
           helm install mig . -n restricted -f examples/values-migration-job.yaml \
             --set jobs.migrate.hookDeletePolicy=before-hook-creation --wait --timeout 3m
