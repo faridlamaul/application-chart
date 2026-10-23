@@ -22,7 +22,7 @@ Sleep 500ms
 Show
 
 # One values file, the resources it produces.
-Type "helm template api . -f examples/values-api.yaml | grep -E '^kind:'" Sleep 400ms Enter
+Type "helm template api . -f examples/values-api.yaml --skip-tests | grep -E '^kind:'" Sleep 400ms Enter
 Sleep 2s
 
 # The secure defaults in the rendered pod spec.
