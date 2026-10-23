@@ -1,0 +1,155 @@
+suite: gateway api routes
+templates:
+  - templates/httproute.yaml
+  - templates/grpcroute.yaml
+  - templates/validate.yaml
+release:
+  name: app
+tests:
+  - it: renders nothing by default
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/httproute.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/grpcroute.yaml
+
+  - it: renders an HTTPRoute to the chart Service
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs: [{name: gw}]
+      httpRoute.hostnames: [app.example.com]
+    template: templates/httproute.yaml
+    asserts:
+      - isKind:
+          of: HTTPRoute
+      - isAPIVersion:
+          of: gateway.networking.k8s.io/v1
+      - equal:
+          path: metadata.name
+          value: app-shipform
+      - equal:
+          path: spec.parentRefs
+          value: [{name: gw}]
+      - equal:
+          path: spec.hostnames
+          value: [app.example.com]
+      - equal:
+          path: spec.rules[0].backendRefs
+          value: [{name: app-shipform, port: 80}]
+      - equal:
+          path: spec.rules[0].matches[0].path
+          value: {type: PathPrefix, value: /}
+
+  - it: resolves a numeric servicePort
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs: [{name: gw}]
+      httpRoute.rules: [{servicePort: 80}]
+    template: templates/httproute.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 80
+
+  - it: resolves a numeric servicePort given through --set as an integer
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs: [{name: gw}]
+      httpRoute.rules[0].servicePort: 80
+    template: templates/httproute.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 80
+
+  - it: passes filters and timeouts through
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs: [{name: gw}]
+      httpRoute.rules:
+        - servicePort: http
+          timeouts: {request: 30s}
+          filters: [{type: RequestHeaderModifier, requestHeaderModifier: {set: [{name: X-A, value: b}]}}]
+    template: templates/httproute.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].timeouts
+          value: {request: 30s}
+      - equal:
+          path: spec.rules[0].filters[0].type
+          value: RequestHeaderModifier
+
+  - it: renders a GRPCRoute
+    set:
+      grpcRoute.enabled: true
+      grpcRoute.parentRefs: [{name: gw}]
+      service.ports: [{name: grpc, port: 9090, targetPort: grpc}]
+    template: templates/grpcroute.yaml
+    asserts:
+      - isKind:
+          of: GRPCRoute
+      - isAPIVersion:
+          of: gateway.networking.k8s.io/v1
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 9090
+      - notExists:
+          path: spec.rules[0].matches
+
+  - it: fails without a Service
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs: [{name: gw}]
+      service.enabled: false
+    template: templates/validate.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: httpRoute.enabled requires service.enabled
+
+  - it: fails a GRPCRoute without a Service
+    set:
+      grpcRoute.enabled: true
+      grpcRoute.parentRefs: [{name: gw}]
+      service.enabled: false
+    template: templates/validate.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: grpcRoute.enabled requires service.enabled
+
+  - it: fails on an unknown servicePort
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs: [{name: gw}]
+      httpRoute.rules: [{servicePort: admin}]
+    template: templates/validate.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: 'httpRoute.rules\[0\].servicePort "admin" matches no service.ports entry'
+
+  - it: fails on an unknown GRPCRoute servicePort
+    set:
+      grpcRoute.enabled: true
+      grpcRoute.parentRefs: [{name: gw}]
+    template: templates/validate.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: 'grpcRoute.rules\[0\].servicePort "grpc" matches no service.ports entry'
+
+  - it: rejects an empty parentRefs when enabled
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs: []
+    template: templates/httproute.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: parentRefs
+
+  - it: rejects unknown keys in a route rule
+    set:
+      httpRoute.rules: [{servicePrt: http}]
+    template: templates/httproute.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: servicePrt

@@ -45,6 +45,33 @@ jobs:
           helm template app . --set ingress.enabled=true --set ingress.hosts[0].host=a.example.com \
             --set ingress.hosts[0].paths[0].path=/ --set ingress.hosts[0].paths[0].servicePort=80 \
             > rendered/set-int-service-port.yaml
+          # Feature toggles that have no example, so kubeconform covers every kind.
+          helm template app . --set grpcRoute.enabled=true \
+            --set 'grpcRoute.parentRefs[0].name=public' \
+            --set 'service.ports[0].name=grpc' --set 'service.ports[0].port=9090' \
+            --set 'service.ports[0].targetPort=grpc' \
+            --set 'containerPorts[0].name=grpc' --set 'containerPorts[0].containerPort=9090' \
+            > rendered/toggle-grpcroute.yaml
+          helm template app . --set verticalPodAutoscaler.enabled=true \
+            > rendered/toggle-vpa.yaml
+          helm template app . --set podMonitor.enabled=true \
+            > rendered/toggle-podmonitor.yaml
+          cat > rendered-rule-values.tmp <<'EOF2'
+          prometheusRule:
+            enabled: true
+            groups:
+              - name: app
+                rules:
+                  - alert: AppDown
+                    expr: up == 0
+                    for: 5m
+                    labels:
+                      severity: critical
+          EOF2
+          helm template app . -f rendered-rule-values.tmp > rendered/toggle-prometheusrule.yaml
+          rm rendered-rule-values.tmp
+          helm template app . --set cronJobs.tick.enabled=true --set 'cronJobs.tick.schedule=*/5 * * * *' \
+            > rendered/toggle-companion-cronjob.yaml
 
       - name: Validate manifests against the minimum and a current Kubernetes version
         run: |
@@ -78,34 +105,55 @@ jobs:
 
       - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
 
+      - name: Create a namespace that enforces the restricted Pod Security Standard
+        run: |
+          kubectl create namespace restricted --dry-run=client -o yaml | kubectl apply -f -
+          kubectl label namespace restricted pod-security.kubernetes.io/enforce=restricted --overwrite
+
       - name: Default values install, become ready, and pass helm test
         run: |
-          helm install web . --wait --timeout 3m
-          helm test web --logs
+          helm install web . -n restricted --wait --timeout 3m
+          helm test web -n restricted --logs
 
       - name: StatefulSet pods resolve through the headless governing Service
         run: |
-          helm install db . --set workload.type=StatefulSet --set replicaCount=1 --wait --timeout 3m
+          helm install db . -n restricted --set workload.type=StatefulSet --set replicaCount=1 --wait --timeout 3m
           # busybox nslookup ignores the search domains, so use the full name.
-          kubectl run dns-check --image=busybox:1.36 --restart=Never --rm -i --quiet -- \
-            nslookup db-application-chart-0.db-application-chart-headless.default.svc.cluster.local
+          # The namespace enforces restricted, so the probe pod needs a compliant securityContext.
+          kubectl -n restricted run dns-check --image=busybox:1.36 --restart=Never --rm -i --quiet \
+            --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":65534,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"dns-check","image":"busybox:1.36","securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}' -- \
+            nslookup db-shipform-0.db-shipform-headless.restricted.svc.cluster.local
 
       - name: Redis StatefulSet example runs as non-root with storage
         run: |
-          helm install cache . -f examples/values-statefulset.yaml --set replicaCount=1 \
+          helm install cache . -n restricted -f examples/values-statefulset.yaml --set replicaCount=1 \
             --set 'statefulSet.volumeClaimTemplates[0].spec.resources.requests.storage=1Gi' \
             --wait --timeout 4m
-          kubectl exec cache-0 -- redis-cli ping | grep PONG
+          kubectl -n restricted exec cache-0 -- redis-cli ping | grep PONG
 
       - name: Job runs as a hook and an upgrade with a changed pod template succeeds
         run: |
           job_args=(--set workload.type=Job --set image.repository=busybox --set image.tag=1.36
             --set podSecurityContext.runAsUser=65534 --set 'job.command={sh,-c,echo done}'
             --set service.enabled=false --wait --timeout 3m)
-          helm install batch . "${job_args[@]}"
-          kubectl wait --for=condition=complete job/batch-application-chart --timeout=60s
-          helm upgrade batch . "${job_args[@]}" --set 'job.env[0].name=RUN' --set-string 'job.env[0].value=2'
-          kubectl get job batch-application-chart -o jsonpath='{.spec.template.spec.containers[0].env[0].value}' | grep -x 2
+          helm install batch . -n restricted "${job_args[@]}"
+          kubectl -n restricted wait --for=condition=complete job/batch-shipform --timeout=60s
+          helm upgrade batch . -n restricted "${job_args[@]}" --set 'job.env[0].name=RUN' --set-string 'job.env[0].value=2'
+          kubectl -n restricted get job batch-shipform -o jsonpath='{.spec.template.spec.containers[0].env[0].value}' | grep -x 2
+
+      - name: Migration hook runs and completes
+        run: |
+          helm install mig . -n restricted -f examples/values-migration-job.yaml \
+            --set jobs.migrate.hookDeletePolicy=before-hook-creation --wait --timeout 3m
+          kubectl -n restricted logs job/mig-shipform-migrate | grep -x migrated
+
+      - name: Persistence survives a pod restart
+        run: |
+          helm install data . -n restricted -f examples/values-persistence.yaml --wait --timeout 3m
+          kubectl -n restricted exec deploy/data-shipform -- sh -c 'echo ok > /data/probe'
+          kubectl -n restricted rollout restart deploy/data-shipform
+          kubectl -n restricted rollout status deploy/data-shipform --timeout=3m
+          kubectl -n restricted exec deploy/data-shipform -- cat /data/probe | grep -x ok
 
       - name: Diagnostics on failure
         if: failure()

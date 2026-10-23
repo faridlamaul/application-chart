@@ -1,0 +1,219 @@
+suite: security hardening
+templates:
+  - templates/deployment.yaml
+  - templates/networkpolicy.yaml
+  - templates/validate.yaml
+tests:
+  - it: defaults to a read-only root with a /tmp emptyDir
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir:
+              sizeLimit: 64Mi
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+
+  - it: sets the /tmp emptyDir medium when configured
+    template: templates/deployment.yaml
+    set:
+      tmpDir.medium: Memory
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir:
+              sizeLimit: 64Mi
+              medium: Memory
+
+  - it: skips the /tmp volume when disabled
+    template: templates/deployment.yaml
+    set:
+      tmpDir.enabled: false
+    asserts:
+      - notExists:
+          path: spec.template.spec.volumes
+      - notExists:
+          path: spec.template.spec.containers[0].volumeMounts
+
+  - it: skips the /tmp volume when the user mounts /tmp
+    template: templates/deployment.yaml
+    set:
+      volumes:
+        - name: scratch
+          emptyDir: {}
+      volumeMounts:
+        - name: scratch
+          mountPath: /tmp
+    asserts:
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir:
+              sizeLimit: 64Mi
+      - lengthEqual:
+          path: spec.template.spec.containers[0].volumeMounts
+          count: 1
+
+  - it: disables service links
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.enableServiceLinks
+          value: false
+
+  - it: allows DNS egress when Egress is enforced
+    template: templates/networkpolicy.yaml
+    set:
+      networkPolicy.enabled: true
+      networkPolicy.policyTypes: [Ingress, Egress]
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            to:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: kube-system
+                podSelector:
+                  matchLabels:
+                    k8s-app: kube-dns
+            ports:
+              - port: 53
+                protocol: UDP
+              - port: 53
+                protocol: TCP
+
+  - it: keeps user egress rules next to the DNS rule
+    template: templates/networkpolicy.yaml
+    set:
+      networkPolicy.enabled: true
+      networkPolicy.policyTypes: [Egress]
+      networkPolicy.egress:
+        - ports:
+            - port: 443
+              protocol: TCP
+    asserts:
+      - lengthEqual:
+          path: spec.egress
+          count: 2
+
+  - it: adds no DNS rule for Ingress-only policies
+    template: templates/networkpolicy.yaml
+    set:
+      networkPolicy.enabled: true
+    asserts:
+      - notExists:
+          path: spec.egress
+
+  - it: adds no DNS rule when allowDNS is disabled
+    template: templates/networkpolicy.yaml
+    set:
+      networkPolicy.enabled: true
+      networkPolicy.policyTypes: [Egress]
+      networkPolicy.allowDNS.enabled: false
+    asserts:
+      - notExists:
+          path: spec.egress
+
+  - it: rejects privileged containers
+    template: templates/deployment.yaml
+    set:
+      securityContext.privileged: true
+    asserts:
+      - failedTemplate: {}
+
+  - it: rejects hostPath volumes
+    template: templates/deployment.yaml
+    set:
+      volumes:
+        - name: host
+          hostPath:
+            path: /var/run
+    asserts:
+      - failedTemplate: {}
+
+  - it: rejects added capabilities other than NET_BIND_SERVICE
+    template: templates/deployment.yaml
+    set:
+      securityContext.capabilities.add: [SYS_ADMIN]
+    asserts:
+      - failedTemplate: {}
+
+  - it: accepts NET_BIND_SERVICE
+    template: templates/deployment.yaml
+    set:
+      securityContext.capabilities.add: [NET_BIND_SERVICE]
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects privileged extraContainers
+    template: templates/deployment.yaml
+    set:
+      extraContainers:
+        - name: sidecar
+          image: busybox:1.36
+          securityContext:
+            privileged: true
+    asserts:
+      - failedTemplate: {}
+
+  - it: rejects privileged initContainers
+    template: templates/deployment.yaml
+    set:
+      initContainers:
+        - name: init
+          image: busybox:1.36
+          securityContext:
+            privileged: true
+    asserts:
+      - failedTemplate: {}
+
+  - it: rejects a user volume named tmp while tmpDir is enabled
+    template: templates/validate.yaml
+    set:
+      volumes:
+        - name: tmp
+          emptyDir: {}
+    asserts:
+      - failedTemplate:
+          errorPattern: 'volumes: the name "tmp" is reserved while tmpDir.enabled is true'
+
+  - it: accepts a user volume named tmp when tmpDir is disabled
+    template: templates/validate.yaml
+    set:
+      tmpDir.enabled: false
+      volumes:
+        - name: tmp
+          emptyDir: {}
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an empty allowDNS peer list
+    template: templates/networkpolicy.yaml
+    set:
+      networkPolicy.enabled: true
+      networkPolicy.allowDNS.to: []
+    asserts:
+      - failedTemplate:
+          errorPattern: allowDNS
+
+  - it: rejects a null allowDNS peer list
+    template: templates/networkpolicy.yaml
+    set:
+      networkPolicy.enabled: true
+      networkPolicy.policyTypes: [Egress]
+      networkPolicy.allowDNS.to: null
+    asserts:
+      - failedTemplate:
+          errorPattern: networkPolicy.allowDNS.to must list at least one peer when allowDNS.enabled is true

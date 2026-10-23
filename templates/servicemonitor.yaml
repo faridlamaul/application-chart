@@ -2,12 +2,12 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "application-chart.fullname" . }}
+  name: {{ include "shipform.fullname" . }}
   {{- with .Values.serviceMonitor.namespace }}
   namespace: {{ . }}
   {{- end }}
   labels:
-    {{- include "application-chart.labelsWith" (dict "root" . "extra" .Values.serviceMonitor.labels) | nindent 4 }}
+    {{- include "shipform.labelsWith" (dict "root" . "extra" .Values.serviceMonitor.labels) | nindent 4 }}
   {{- with .Values.serviceMonitor.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -15,10 +15,10 @@ metadata:
 spec:
   selector:
     matchLabels:
-      {{- include "application-chart.selectorLabels" . | nindent 6 }}
+      {{- include "shipform.selectorLabels" . | nindent 6 }}
     # Skip the StatefulSet's -headless governing Service so pods are scraped once.
     matchExpressions:
-      - key: application-chart/governing-service
+      - key: shipform/governing-service
         operator: DoesNotExist
   namespaceSelector:
     matchNames:

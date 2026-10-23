@@ -1,0 +1,45 @@
+nameOverride: queue-worker
+
+workload:
+  type: Deployment
+
+image:
+  repository: ghcr.io/example/queue-worker
+  tag: "1.4.0"
+
+containerPorts: []
+
+command:
+  - /app/worker
+
+service:
+  enabled: false
+
+readinessProbe:
+  enabled: false
+livenessProbe:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+# Scale on queue depth, down to zero when the queue is empty.
+keda:
+  enabled: true
+  minReplicaCount: 0
+  maxReplicaCount: 20
+  pollingInterval: 15
+  cooldownPeriod: 120
+  triggers:
+    - type: rabbitmq
+      metadata:
+        protocol: amqp
+        queueName: jobs
+        mode: QueueLength
+        value: "20"
+      authenticationRef:
+        name: rabbitmq-auth

@@ -1,0 +1,474 @@
+suite: companion jobs and cron jobs
+templates:
+  - templates/companion-jobs.yaml
+  - templates/companion-cronjobs.yaml
+  - templates/validate.yaml
+release:
+  name: app
+tests:
+  - it: renders nothing by default
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/companion-jobs.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/companion-cronjobs.yaml
+
+  - it: renders an enabled job with inherited image and env
+    set:
+      env:
+        - name: A
+          value: "1"
+      jobs.migrate:
+        enabled: true
+        command: [migrate, up]
+    template: templates/companion-jobs.yaml
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.name
+          value: app-shipform-migrate
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: nginxinc/nginx-unprivileged:1.27
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value: [migrate, up]
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: A
+            value: "1"
+      - notExists:
+          path: spec.template.spec.containers[0].livenessProbe
+      - notExists:
+          path: spec.template.spec.containers[0].readinessProbe
+      - notExists:
+          path: spec.template.spec.containers[0].startupProbe
+      - notExists:
+          path: spec.template.spec.containers[0].ports
+      - equal:
+          path: spec.template.spec.restartPolicy
+          value: Never
+      - equal:
+          path: spec.backoffLimit
+          value: 3
+      - equal:
+          path: spec.ttlSecondsAfterFinished
+          value: 300
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-install,post-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation,hook-succeeded
+
+  - it: labels companion pods apart from the main workload
+    set:
+      jobs.migrate.enabled: true
+    template: templates/companion-jobs.yaml
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/name"]
+          value: shipform-migrate
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/instance"]
+          value: app
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/component"]
+          value: migrate
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: shipform-migrate
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: migrate
+
+  - it: adds hook annotations
+    set:
+      jobs.migrate:
+        enabled: true
+        hook: pre-install,pre-upgrade
+    template: templates/companion-jobs.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: pre-install,pre-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "0"
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation,hook-succeeded
+
+  - it: runs pre-install hooks as the default ServiceAccount
+    set:
+      jobs.migrate:
+        enabled: true
+        hook: pre-install,pre-upgrade
+    template: templates/companion-jobs.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: default
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+
+  - it: keeps a named ServiceAccount for pre-install hooks
+    set:
+      serviceAccount.create: false
+      serviceAccount.name: app-sa
+      jobs.migrate:
+        enabled: true
+        hook: pre-install
+    template: templates/companion-jobs.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: app-sa
+
+  - it: uses the chart ServiceAccount for post-install hooks
+    set:
+      jobs.seed:
+        enabled: true
+        hook: post-install
+    template: templates/companion-jobs.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: app-shipform
+
+  - it: lets an explicit serviceAccountName win
+    set:
+      jobs.migrate:
+        enabled: true
+        hook: pre-install
+        serviceAccountName: migrator
+    template: templates/companion-jobs.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: migrator
+
+  - it: skips disabled entries
+    set:
+      jobs.migrate.enabled: false
+      cronJobs.cleanup:
+        enabled: false
+        schedule: "0 3 * * *"
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/companion-jobs.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/companion-cronjobs.yaml
+
+  - it: renders entries in key order
+    set:
+      jobs.zeta.enabled: true
+      jobs.alpha.enabled: true
+    template: templates/companion-jobs.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.name
+          value: app-shipform-alpha
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: app-shipform-zeta
+        documentIndex: 1
+
+  - it: omits sidecars, init containers and persistence
+    set:
+      extraContainers:
+        - name: proxy
+          image: x:1
+      initContainers:
+        - name: init
+          image: x:1
+      persistence.enabled: true
+      jobs.migrate.enabled: true
+    template: templates/companion-jobs.yaml
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+      - notExists:
+          path: spec.template.spec.initContainers
+      - notContains:
+          path: spec.template.spec.volumes
+          any: true
+          content:
+            name: persistence
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          any: true
+          content:
+            name: persistence
+
+  - it: keeps the tmp volume and root volumes
+    set:
+      volumes:
+        - name: cache
+          emptyDir: {}
+      volumeMounts:
+        - name: cache
+          mountPath: /cache
+      jobs.migrate.enabled: true
+    template: templates/companion-jobs.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: cache
+            emptyDir: {}
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: cache
+            mountPath: /cache
+
+  - it: replaces the root securityContext and image when set on the entry
+    set:
+      jobs.migrate:
+        enabled: true
+        image:
+          repository: busybox
+          tag: "1.36"
+        securityContext:
+          runAsUser: 65534
+    template: templates/companion-jobs.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: busybox:1.36
+      - equal:
+          path: spec.template.spec.containers[0].securityContext
+          value:
+            runAsUser: 65534
+
+  - it: does not inherit root command, args and resources
+    set:
+      command: [/app/server]
+      args: [--port=8080]
+      resources:
+        limits:
+          memory: 1Gi
+      jobs.migrate:
+        enabled: true
+        image:
+          repository: busybox
+          tag: "1.36"
+    template: templates/companion-jobs.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].command
+      - notExists:
+          path: spec.template.spec.containers[0].args
+      - notExists:
+          path: spec.template.spec.containers[0].resources
+
+  - it: uses only the entry command and args
+    set:
+      args: [--port=8080]
+      jobs.migrate:
+        enabled: true
+        command: [migrate]
+    template: templates/companion-jobs.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value: [migrate]
+      - notExists:
+          path: spec.template.spec.containers[0].args
+
+  - it: does not inherit main-workload scheduling fields
+    set:
+      priorityClassName: high
+      runtimeClassName: gvisor
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+      cronJobs.cleanup:
+        enabled: true
+        schedule: "0 3 * * *"
+    template: templates/companion-cronjobs.yaml
+    asserts:
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.topologySpreadConstraints
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.priorityClassName
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.runtimeClassName
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.terminationGracePeriodSeconds
+
+  - it: renders a cron job with timeZone
+    set:
+      cronJobs.cleanup:
+        enabled: true
+        schedule: "0 3 * * *"
+        timeZone: Asia/Jakarta
+    template: templates/companion-cronjobs.yaml
+    asserts:
+      - isKind:
+          of: CronJob
+      - equal:
+          path: metadata.name
+          value: app-shipform-cleanup
+      - equal:
+          path: spec.schedule
+          value: "0 3 * * *"
+      - equal:
+          path: spec.timeZone
+          value: Asia/Jakarta
+      - equal:
+          path: spec.concurrencyPolicy
+          value: Forbid
+      - equal:
+          path: spec.jobTemplate.spec.template.metadata.labels["app.kubernetes.io/name"]
+          value: shipform-cleanup
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.serviceAccountName
+          value: app-shipform
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.containers[0].livenessProbe
+
+  - it: fails on a job name over 63 characters
+    set:
+      fullnameOverride: a2345678901234567890123456789012345678901234567890123456
+      jobs.migrate.enabled: true
+    template: templates/validate.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "jobs.migrate: name .* exceeds 63 characters"
+
+  - it: fails on a cron job name over 52 characters
+    set:
+      fullnameOverride: a23456789012345678901234567890123456789012345678
+      cronJobs.cleanup:
+        enabled: true
+        schedule: "0 3 * * *"
+    template: templates/validate.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "cronJobs.cleanup: name .* exceeds 52 characters"
+
+  - it: rejects invalid keys
+    set:
+      jobs.Bad_Key.enabled: true
+    template: templates/companion-jobs.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: Bad_Key
+
+  - it: rejects unknown entry fields
+    set:
+      jobs.migrate:
+        enabled: true
+        comand: [x]
+    template: templates/companion-jobs.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: comand
+
+  - it: rejects a privileged companion
+    set:
+      cronJobs.cleanup:
+        enabled: true
+        schedule: "0 3 * * *"
+        securityContext:
+          privileged: true
+    template: templates/companion-cronjobs.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: privileged
+
+  - it: requires a schedule on an enabled cron job
+    set:
+      cronJobs.cleanup.enabled: true
+    template: templates/companion-cronjobs.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: schedule
+
+  - it: skips root mounts that have no volume in the companion pod
+    set:
+      workload.type: StatefulSet
+      statefulSet.volumeClaimTemplates:
+        - metadata:
+            name: data
+          spec:
+            accessModes: [ReadWriteOnce]
+            resources:
+              requests:
+                storage: 1Gi
+      volumeMounts:
+        - name: data
+          mountPath: /data
+      jobs.migrate.enabled: true
+      cronJobs.cleanup:
+        enabled: true
+        schedule: "0 3 * * *"
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: data
+            mountPath: /data
+        template: templates/companion-jobs.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+        template: templates/companion-jobs.yaml
+      - notContains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].volumeMounts
+          content:
+            name: data
+            mountPath: /data
+        template: templates/companion-cronjobs.yaml
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+        template: templates/companion-cronjobs.yaml
+
+  - it: keeps root mounts backed by a root volume in the companion pod
+    set:
+      volumes:
+        - name: config
+          configMap:
+            name: app-config
+      volumeMounts:
+        - name: config
+          mountPath: /etc/app
+      jobs.migrate.enabled: true
+    template: templates/companion-jobs.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: config
+            mountPath: /etc/app
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: config
+            configMap:
+              name: app-config

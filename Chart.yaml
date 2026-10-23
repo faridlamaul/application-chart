@@ -1,13 +1,13 @@
 apiVersion: v2
-name: application-chart
+name: shipform
 description: A generic, production-ready Helm chart for Kubernetes application workloads
 type: application
-version: 0.3.0
+version: 0.4.0
 appVersion: "1.0.0"
 kubeVersion: ">=1.25.0-0"
-home: https://github.com/faridlamaul/application-chart
+home: https://github.com/faridlamaul/shipform
 sources:
-  - https://github.com/faridlamaul/application-chart
+  - https://github.com/faridlamaul/shipform
 keywords:
   - application
   - backend

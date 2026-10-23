@@ -55,7 +55,7 @@ tests:
           value: payments
       - equal:
           path: metadata.labels["app.kubernetes.io/name"]
-          value: application-chart
+          value: shipform
       - equal:
           path: metadata.labels.team
           value: core

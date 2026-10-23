@@ -1,0 +1,17 @@
+# A single replica that keeps files in /data across restarts.
+# ReadWriteOnce volumes need Recreate: a RollingUpdate can leave the new pod
+# pending while the old pod still holds the volume.
+replicaCount: 1
+
+deploymentStrategy:
+  type: Recreate
+
+# The default image runs as uid 101; fsGroup lets it write to the volume on any
+# provisioner. runAsNonRoot and seccompProfile keep their chart defaults.
+podSecurityContext:
+  fsGroup: 101
+
+persistence:
+  enabled: true
+  size: 1Gi
+  mountPath: /data

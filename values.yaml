@@ -1,4 +1,4 @@
-# Default values for application-chart.
+# Default values for shipform.
 # This file is intentionally generic. Do not commit real secrets here.
 
 nameOverride: ""
@@ -63,10 +63,38 @@ podSecurityContext:
 
 securityContext:
   allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: false
+  readOnlyRootFilesystem: true
   capabilities:
     drop:
       - ALL
+
+# An emptyDir mounted at /tmp so applications can write temporary files under
+# the read-only root filesystem. Skipped when volumeMounts already mounts /tmp.
+# Set medium to Memory for a tmpfs; its usage counts against the memory limit.
+tmpDir:
+  enabled: true
+  sizeLimit: 64Mi
+  medium: ""
+
+# A standalone PersistentVolumeClaim mounted in the main container. Not
+# supported for workload.type StatefulSet (use statefulSet.volumeClaimTemplates).
+# ReadWriteOnce with more than one replica, or with RollingUpdate, can leave new
+# pods pending. The chart-created claim is kept on uninstall when keep is true.
+persistence:
+  enabled: false
+  existingClaim: ""
+  storageClassName: null # null: cluster default; "": no class
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
+  mountPath: /data
+  subPath: ""
+  annotations: {}
+  keep: true
+
+# Kubernetes injects one set of environment variables per Service in the
+# namespace when this is true. Use DNS names instead.
+enableServiceLinks: false
 
 serviceAccount:
   create: true
@@ -95,6 +123,30 @@ service:
   sessionAffinityConfig: {}
   internalTrafficPolicy: ""
   externalTrafficPolicy: ""
+
+httpRoute:
+  enabled: false
+  annotations: {}
+  labels: {}
+  parentRefs: []
+  hostnames: []
+  rules:
+    - matches:
+        - path: {type: PathPrefix, value: /}
+      filters: []
+      timeouts: {}
+      servicePort: http
+
+grpcRoute:
+  enabled: false
+  annotations: {}
+  labels: {}
+  parentRefs: []
+  hostnames: []
+  rules:
+    - matches: []
+      filters: []
+      servicePort: grpc
 
 ingress:
   enabled: false
@@ -146,6 +198,31 @@ autoscaling:
   metrics: []
   behavior: {}
 
+# KEDA ScaledObject. Requires the KEDA operator; excludes autoscaling.enabled.
+keda:
+  enabled: false
+  annotations: {}
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  idleReplicaCount: null
+  pollingInterval: 30
+  cooldownPeriod: 300
+  fallback: {}
+  advanced: {}
+  # Required (at least one) when enabled. Items are KEDA trigger objects.
+  triggers: []
+
+# VerticalPodAutoscaler. Requires the VPA CRDs. Use updateMode Off (recommend only)
+# alongside autoscaling or keda.
+verticalPodAutoscaler:
+  enabled: false
+  updateMode: "Off" # Off, Initial, Recreate, InPlaceOrRecreate, Auto
+  minReplicas: null
+  controlledResources: [cpu, memory]
+  controlledValues: RequestsAndLimits
+  minAllowed: {}
+  maxAllowed: {}
+
 podDisruptionBudget:
   enabled: false
   # Set one of the two; minAvailable defaults to 1 when both are null.
@@ -157,6 +234,17 @@ networkPolicy:
   labels: {}
   policyTypes:
     - Ingress
+  # Prepends an egress rule allowing port 53 (UDP and TCP) to the peers in
+  # `to`. Rendered only when policyTypes contains Egress.
+  allowDNS:
+    enabled: true
+    to:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: kube-system
+        podSelector:
+          matchLabels:
+            k8s-app: kube-dns
   ingress: []
   egress: []
 
@@ -172,6 +260,30 @@ serviceMonitor:
   scheme: http
   relabelings: []
   metricRelabelings: []
+
+prometheusRule:
+  enabled: false
+  namespace: ""
+  labels: {}
+  annotations: {}
+  groups: []                        # required (at least one group) when enabled
+
+podMonitor:
+  enabled: false                    # cannot be combined with serviceMonitor.enabled
+  namespace: ""
+  labels: {}
+  annotations: {}
+  interval: 30s
+  scrapeTimeout: 10s
+  path: /metrics
+  port: http                        # container port name
+  scheme: http
+  relabelings: []
+  metricRelabelings: []
+
+# Extra manifests: each item is a map or a string. Maps render through
+# tpl (toYaml .); strings through tpl. The chart adds no labels.
+extraObjects: []
 
 deploymentStrategy:
   type: RollingUpdate
@@ -233,6 +345,58 @@ cronjob:
   env: []
   envFrom: []
   resources: {}
+
+# Companion Jobs, rendered next to the main workload. Each key names one Job,
+# <fullname>-<key>; keys match ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ and the name
+# must fit in 63 characters. A companion inherits the root image, imagePullSecrets,
+# env, envFrom, volumes, volumeMounts, podSecurityContext, securityContext,
+# nodeSelector, tolerations, affinity and tmpDir. It does not get command, args,
+# resources, probes, lifecycle, containerPorts, initContainers, extraContainers,
+# persistence, priorityClassName, runtimeClassName, topologySpreadConstraints or
+# terminationGracePeriodSeconds; set command, args and resources on the entry.
+# Its pods carry app.kubernetes.io/name: <name>-<key>, so the main Service,
+# PodDisruptionBudget and NetworkPolicy do not select them.
+# A hook that includes pre-install runs before the chart's ConfigMap, Secret,
+# ExternalSecret and ServiceAccount exist: reference existing Secrets, and it
+# runs as the "default" ServiceAccount unless serviceAccountName is set.
+# Every companion Job is a Helm hook, because a Job's pod template is immutable;
+# an empty hook means post-install,post-upgrade.
+jobs: {}
+#  migrate:
+#    enabled: true
+#    hook: pre-install,pre-upgrade   # empty: post-install,post-upgrade
+#    hookWeight: "0"
+#    hookDeletePolicy: before-hook-creation,hook-succeeded
+#    serviceAccountName: ""          # empty: see above
+#    image: {}                       # empty: .Values.image; else repository and tag
+#    command: []                     # empty: the image entrypoint
+#    args: []                        # empty: the image's default arguments
+#    env: []                         # appended to .Values.env
+#    envFrom: []                     # appended to .Values.envFrom
+#    resources: {}                   # empty: none
+#    securityContext: {}             # empty: .Values.securityContext; else replaces it
+#    backoffLimit: 3
+#    activeDeadlineSeconds: null
+#    ttlSecondsAfterFinished: 300
+#    restartPolicy: Never
+#    annotations: {}
+#    labels: {}
+#    podAnnotations: {}
+
+# Companion CronJobs. Same rules as jobs, except the name must fit in 52
+# characters (the controller appends a suffix to each Job) and there are no
+# hooks.
+cronJobs: {}
+#  cleanup:
+#    enabled: true
+#    schedule: "0 3 * * *"
+#    timeZone: ""                    # e.g. Asia/Jakarta; empty: the controller's zone
+#    concurrencyPolicy: Forbid
+#    suspend: false
+#    successfulJobsHistoryLimit: 3
+#    failedJobsHistoryLimit: 1
+#    startingDeadlineSeconds: null
+#    (plus every jobs field except hook, hookWeight and hookDeletePolicy)
 
 tests:
   enabled: true

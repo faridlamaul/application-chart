@@ -2,16 +2,18 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "application-chart.fullname" . }}
+  name: {{ include "shipform.fullname" . }}
   labels:
-    {{- include "application-chart.labels" . | nindent 4 }}
+    {{- include "shipform.labels" . | nindent 4 }}
   {{- with .Values.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  serviceName: {{ include "application-chart.statefulSetServiceName" . }}
+  serviceName: {{ include "shipform.statefulSetServiceName" . }}
+  {{- if not .Values.keda.enabled }}
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
   podManagementPolicy: {{ .Values.statefulSet.podManagementPolicy }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   updateStrategy:
@@ -22,11 +24,11 @@ spec:
   {{- end }}
   selector:
     matchLabels:
-      {{- include "application-chart.selectorLabels" . | nindent 6 }}
+      {{- include "shipform.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "application-chart.selectorLabels" . | nindent 8 }}
+        {{- include "shipform.selectorLabels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -43,7 +45,7 @@ spec:
         {{- end }}
       {{- end }}
     spec:
-      {{- include "application-chart.podSpec" (dict "root" . "restartPolicy" "Always") | nindent 6 }}
+      {{- include "shipform.podSpec" (dict "root" . "restartPolicy" "Always") | nindent 6 }}
   {{- with .Values.statefulSet.volumeClaimTemplates }}
   volumeClaimTemplates:
     {{- toYaml . | nindent 4 }}

@@ -2,9 +2,9 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: {{ include "application-chart.fullname" . }}
+  name: {{ include "shipform.fullname" . }}
   labels:
-    {{- include "application-chart.labelsWith" (dict "root" . "extra" .Values.cronjob.labels) | nindent 4 }}
+    {{- include "shipform.labelsWith" (dict "root" . "extra" .Values.cronjob.labels) | nindent 4 }}
   {{- with .Values.cronjob.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -24,7 +24,7 @@ spec:
       template:
         metadata:
           labels:
-            {{- include "application-chart.selectorLabels" . | nindent 12 }}
+            {{- include "shipform.selectorLabels" . | nindent 12 }}
             {{- with .Values.podLabels }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -34,6 +34,6 @@ spec:
           {{- end }}
         spec:
           {{- $container := dict "command" .Values.cronjob.command "args" .Values.cronjob.args "env" .Values.cronjob.env "envFrom" .Values.cronjob.envFrom "resources" .Values.cronjob.resources "ports" (list) "livenessProbe" (dict) "readinessProbe" (dict) "startupProbe" (dict) -}}
-          {{- include "application-chart.podSpec" (dict "root" . "container" $container "restartPolicy" .Values.cronjob.restartPolicy) | nindent 10 }}
+          {{- include "shipform.podSpec" (dict "root" . "container" $container "restartPolicy" .Values.cronjob.restartPolicy "mountPersistence" true) | nindent 10 }}
 {{- end }}
 

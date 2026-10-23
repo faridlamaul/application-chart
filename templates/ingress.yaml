@@ -2,9 +2,9 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "application-chart.fullname" . }}
+  name: {{ include "shipform.fullname" . }}
   labels:
-    {{- include "application-chart.labels" . | nindent 4 }}
+    {{- include "shipform.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -27,7 +27,7 @@ spec:
             pathType: {{ default "Prefix" .pathType }}
             backend:
               service:
-                name: {{ include "application-chart.fullname" $ }}
+                name: {{ include "shipform.fullname" $ }}
                 port:
                   {{- /* --set yields int64 and YAML yields float64, so test for a string instead. */}}
                   {{- if kindIs "string" .servicePort }}
